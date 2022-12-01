@@ -1,0 +1,24 @@
+filebeat:
+  config:
+    inputs:
+      enabled: true
+      path: /config/filebeat/prospectors.d/*yml
+      reload.enabled: true
+      reload.period: 2s
+  registry:
+    path: "/out/filebeat/registry"
+    file_permissions: 0600
+output:
+  minio:
+    path: "/out/filebeat/tmp/"
+    EndPoint: "192.168.1.175:9000"
+    Bucket: "cvmart-log"
+    UserName: "admin"
+    Password: "admin123"
+logging:
+  level: info
+  to_files: false
+  files:
+    path: "/out/filebeat/log/"
+    name: "all.log"
+logging.selectors: ["*"]

@@ -35,8 +35,9 @@ RUN chmod +x /pilot/pilot /pilot/entrypoint /pilot/healthz /pilot/config.filebea
 
 HEALTHCHECK CMD /pilot/healthz
 
-VOLUME /var/log/filebeat
-VOLUME /var/lib/filebeat
+VOLUME /out/filebeat/log
+VOLUME /out/filebeat/tmp
+VOLUME /out/filebeat/registry
 
 WORKDIR /pilot/
 ENV PILOT_TYPE=filebeat

@@ -1,0 +1,9 @@
+filebeat.inputs:
+  - type: container
+    enabled: true
+    paths:
+      - /log/test.log
+    fields:
+      trackNo: "uuid_test"
+      minioObjName: "/uuid_test/test.log"
+      limitSize: 50*1024*1024

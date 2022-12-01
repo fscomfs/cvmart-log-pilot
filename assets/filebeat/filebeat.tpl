@@ -1,9 +1,9 @@
 {{range .configList}}
-- type: log
+- type: container
   enabled: true
   paths:
       - {{ .HostDir }}/{{ .File }}
-  scan_frequency: 10s
+  scan_frequency: 5s
   fields_under_root: true
   {{if .Stdout}}
   docker-json: true

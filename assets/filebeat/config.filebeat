@@ -83,6 +83,21 @@ output.console:
 EOF
 }
 
+minio() {
+assert_not_empty "$FILE_PATH" "FILE_PATH required"
+
+cat >> $FILEBEAT_CONFIG << EOF
+$(base)
+output.minio:
+    path: $FILE_PATH
+    ${END_POINT:+EndPoint: ${END_POINT}}
+    ${BUCKET:+Bucket: ${BUCKET}}
+    ${USERNAME:+UserName: ${USERNAME}}
+    ${PASSWORD:+Password: ${PASSWORD}}
+EOF
+}
+
+
 file() {
 assert_not_empty "$FILE_PATH" "FILE_PATH required"
 
@@ -96,6 +111,7 @@ output.file:
     ${FILE_PERMISSIONS:+permissions: ${FILE_PERMISSIONS}}
 EOF
 }
+
 
 logstash() {
 assert_not_empty "$LOGSTASH_HOST" "LOGSTASH_HOST required"

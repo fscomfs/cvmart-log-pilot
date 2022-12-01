@@ -18,8 +18,8 @@ import (
 // Global variables for FilebeatPiloter
 const (
 	FILEBEAT_EXEC_CMD  = "/usr/bin/filebeat"
-	FILEBEAT_REGISTRY  = "/var/lib/filebeat/registry"
-	FILEBEAT_BASE_CONF = "/etc/filebeat"
+	FILEBEAT_REGISTRY  = "/out/filebeat/registry/filebeat/log.json"
+	FILEBEAT_BASE_CONF = "/config/filebeat"
 	FILEBEAT_CONF_DIR  = FILEBEAT_BASE_CONF + "/prospectors.d"
 	FILEBEAT_CONF_FILE = FILEBEAT_BASE_CONF + "/filebeat.yml"
 

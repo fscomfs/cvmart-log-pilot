@@ -382,6 +382,15 @@ func (p *Pilot) newContainer(containerJSON *types.ContainerJSON) error {
 		return err
 	}
 
+	for _, prefix := range p.logPrefix {
+		skipFlag := fmt.Sprintf("%s_log_skip", prefix)
+		if _, ok := labels[skipFlag]; ok {
+			if labels[skipFlag] == "1" || labels[skipFlag] == "true" {
+				log.Debugf("%s container config, skip", id)
+				return nil
+			}
+		}
+	}
 	if len(logConfigs) == 0 {
 		log.Debugf("%s has not log config, skip", id)
 		return nil
@@ -707,7 +716,7 @@ func (p *Pilot) getLogConfigs(jsonLogPath string, mounts []types.MountPoint, lab
 		for _, prefix := range p.logPrefix {
 			customConfig := fmt.Sprintf(ENV_SERVICE_LOGS_CUSTOME_CONFIG_TEMPL, prefix)
 			if customConfig == k {
-				configs := strings.Split(labels[k], "\n")
+				configs := strings.Split(labels[k], ";")
 				for _, c := range configs {
 					if c == "" {
 						continue

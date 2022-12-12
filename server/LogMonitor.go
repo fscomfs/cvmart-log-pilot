@@ -1,12 +1,14 @@
 package server
 
+import "os"
+
 type LogMonitor interface {
 	Start(def *ConnectDef) error
 	Close() error
 }
 
 func NewLogMonitor(logClaim LogClaims) (LogMonitor, error) {
-	if logClaim.minioObjName == "" {
+	if logClaim.MinioObjName == "" {
 		if logClaim.Host == "" {
 			return NewDockerLog("")
 		} else {
@@ -14,6 +16,6 @@ func NewLogMonitor(logClaim LogClaims) (LogMonitor, error) {
 		}
 
 	} else {
-		return NewMinioLog("", "")
+		return NewMinioLog(logClaim.MinioObjName, os.Getenv("BUCKET"))
 	}
 }

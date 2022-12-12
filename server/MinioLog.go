@@ -13,6 +13,9 @@ var minioClient *minio.Client
 
 func init() {
 	minioClient = newMinioClient()
+	if minioClient == nil {
+		panic(nil)
+	}
 }
 
 type MinioLog struct {
@@ -26,19 +29,21 @@ func (m *MinioLog) Start(def *ConnectDef) error {
 	if err != nil {
 		def.WriteMsg <- []byte(err.Error() + "\n")
 		m.closed = true
+		return err
 	}
 
 	r := bufio.NewReader(object)
+	defer object.Close()
 	for {
 		line, e := r.ReadBytes('\n')
 		if e != nil {
+			def.WriteMsg <- []byte(e.Error() + "\n")
 			return e
 		}
 		if m.closed {
 			return nil
 		}
 		def.WriteMsg <- line
-
 	}
 	return nil
 }

@@ -13,7 +13,7 @@ type LogClaims struct {
 	ContainerId  string `json:"containerId"`
 	Operator     string `json:"operator"`
 	PodLabel     string `json:"podLabel"`
-	minioObjName string `json:"minioObjName"`
+	MinioObjName string `json:"minioObjName"`
 	jwt.StandardClaims
 }
 

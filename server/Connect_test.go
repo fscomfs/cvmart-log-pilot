@@ -12,10 +12,11 @@ func TestRegistryConnect(t *testing.T) {
 		//Host:        "localhost",
 		//Port:        "2375",
 		//ContainerId: "285fe975d7de",
-		PodLabel: "log-test",
+		MinioObjName: "uuid2/name2.log",
+		//PodLabel: "log-test",
 		Operator: OPERATOR_LOG,
 		StandardClaims: jwt.StandardClaims{
-			ExpiresAt: time.Now().Unix() + 3600*10,
+			ExpiresAt: time.Now().Unix() + 3600*200,
 		},
 	}
 	token, _ := GeneratorToken(claims)

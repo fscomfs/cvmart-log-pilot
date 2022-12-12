@@ -165,21 +165,6 @@ func (l *DockerLog) Start(def *ConnectDef) error {
 	StdCopy(out, def.WriteMsg, r)
 
 	def.WriteMsg <- []byte("log end")
-	//for {
-	//	var line []byte
-	//	var out = ioutil.Discard
-	//	StdCopy(out, nil, r)
-	//	ioutil.Discard.Write(line)
-	//	//line, err := r.ReadBytes('\n')
-	//	//if err != nil {
-	//	//	return err
-	//	//}
-	//	if l.closed {
-	//		return nil
-	//	}
-	//	def.WriteMsg <- line
-	//}
-
 	return nil
 }
 

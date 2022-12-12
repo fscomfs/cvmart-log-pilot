@@ -14,6 +14,6 @@ func NewLogMonitor(logClaim LogClaims) (LogMonitor, error) {
 		}
 
 	} else {
-		return nil, nil
+		return NewMinioLog("", "")
 	}
 }

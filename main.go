@@ -2,8 +2,9 @@ package main
 
 import (
 	"flag"
-	"github.com/AliyunContainerService/log-pilot/pilot"
 	log "github.com/Sirupsen/logrus"
+	"github.com/fscomfs/cvmart-log-pilot/pilot"
+	"github.com/fscomfs/cvmart-log-pilot/server"
 	"io/ioutil"
 	"os"
 	"path/filepath"
@@ -40,6 +41,8 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
+
+	go server.LogtHandler()
 
 	log.Fatal(pilot.Run(string(b), baseDir))
 }

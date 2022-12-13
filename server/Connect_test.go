@@ -16,8 +16,8 @@ func TestRegistryConnect(t *testing.T) {
 		//	MinioObjName: "uuid2/name2.log",
 		PodLabel: "log-test",
 		Operator: OPERATOR_LOG,
-		StandardClaims: jwt.StandardClaims{
-			ExpiresAt: time.Now().Unix() + 3600*200,
+		RegisteredClaims: jwt.RegisteredClaims{
+			ExpiresAt: jwt.NewNumericDate(time.Now().Add(time.Hour * 24)),
 		},
 	}
 	os.Setenv("JWT_SEC", "111")

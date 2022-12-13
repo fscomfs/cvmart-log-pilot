@@ -14,7 +14,7 @@ type LogClaims struct {
 	Operator     string `json:"operator"`
 	PodLabel     string `json:"podLabel"`
 	MinioObjName string `json:"minioObjName"`
-	jwt.StandardClaims
+	jwt.RegisteredClaims
 }
 
 func Auth(token string) (*LogClaims, error) {

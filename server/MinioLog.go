@@ -12,9 +12,10 @@ import (
 var minioClient *minio.Client
 
 func init() {
-	minioClient = newMinioClient()
-	if minioClient == nil {
-		panic(nil)
+	var err error
+	minioClient, err = newMinioClient()
+	if err != nil {
+		//panic(err.Error())
 	}
 }
 
@@ -60,14 +61,14 @@ func NewMinioLog(objectName string, bucketName string) (LogMonitor, error) {
 	}, nil
 }
 
-func newMinioClient() (client *minio.Client) {
+func newMinioClient() (client *minio.Client, err error) {
 	minioClient, err := minio.New(os.Getenv("MINIO_URL"), &minio.Options{
 		Creds:  credentials.NewStaticV4(os.Getenv("MINIO_USERNAME"), os.Getenv("MINIO_PASSWORD"), ""),
 		Secure: false,
 	})
 	if err != nil {
 		fmt.Printf("create minio client error:%+v", err)
-		return nil
+		return nil, err
 	}
-	return minioClient
+	return minioClient, nil
 }

@@ -5,7 +5,7 @@ import os
 import os.path
 import subprocess
 
-base = '/host'
+base = '/'
 pilot_fluentd = "fluentd"
 pilot_filebeat = "filebeat"
 ENV_PILOT_TYPE = "PILOT_TYPE"
@@ -17,7 +17,7 @@ def umount(volume):
 
 def mount_points():
     with open('/proc/self/mountinfo', 'r') as f:
-        mounts = f.read().decode('utf-8')
+        mounts = f.read()
 
     points = set()
     for line in mounts.split('\n'):
@@ -40,22 +40,22 @@ def run():
     else:
         tpl_config = "/pilot/fluentd.tpl"
 
-    os.execve('/pilot/pilot', ['/pilot/pilot', '-template', tpl_config, '-base', base, '-log-level', 'debug'],
+    os.execve('/pilot/pilot', ['/pilot/pilot', '-template', tpl_config, '-base', "/", '-log-level', 'debug'],
               os.environ)
 
 
 def config():
     pilot_type = os.environ.get(ENV_PILOT_TYPE)
     if pilot_filebeat == pilot_type:
-        print "start log-pilot:", pilot_filebeat
+        print("start log-pilot:", pilot_filebeat)
         subprocess.check_call(['/pilot/config.filebeat'])
     else:
-        print "start log-pilot:", pilot_fluentd
+        print("start log-pilot:", pilot_fluentd)
         subprocess.check_call(['/pilot/config.fluentd'])
 
 
 if __name__ == '__main__':
     config()
     # FIXME need SYS_ADMIN capability
-    cleanup()
+  ##  cleanup()
     run()

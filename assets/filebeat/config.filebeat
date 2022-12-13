@@ -1,14 +1,14 @@
-#!/bin/sh
+#!/bin/bash
 
 set -e
 
-FILEBEAT_CONFIG=/etc/filebeat/filebeat.yml
+FILEBEAT_CONFIG=/config/filebeat/filebeat.yml
 if [ -f "$FILEBEAT_CONFIG" ]; then
     echo "$FILEBEAT_CONFIG has been existed"
     exit
 fi
 
-mkdir -p /etc/filebeat/prospectors.d
+mkdir -p /config/filebeat/prospectors.d
 
 assert_not_empty() {
     arg=$1
@@ -22,7 +22,6 @@ assert_not_empty() {
 cd $(dirname $0)
 
 base() {
-
 assert_not_empty "$FILEBEAT_CONFIG" "FILEBEAT_CONFIG required"
 
 cat >> $FILEBEAT_CONFIG << EOF
@@ -41,7 +40,7 @@ output:
     path: "/out/filebeat/tmp/"
     EndPoint: "${MINIO_URL}"
     Bucket: "${BUCKET}"
-    UserName:"${MINIO_USERNAME}"
+    UserName: "${MINIO_USERNAME}"
     Password: "${MINIO_PASSWORD}"
 logging:
   level: info
@@ -52,6 +51,5 @@ logging:
 logging.selectors: ["*"]
 EOF
 }
-minio
-esac
+base
 

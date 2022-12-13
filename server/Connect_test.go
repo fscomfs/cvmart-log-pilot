@@ -3,6 +3,7 @@ package server
 import (
 	"fmt"
 	"github.com/golang-jwt/jwt/v4"
+	"os"
 	"testing"
 	"time"
 )
@@ -12,15 +13,21 @@ func TestRegistryConnect(t *testing.T) {
 		//Host:        "localhost",
 		//Port:        "2375",
 		//ContainerId: "285fe975d7de",
-		MinioObjName: "uuid2/name2.log",
-		//PodLabel: "log-test",
+		//	MinioObjName: "uuid2/name2.log",
+		PodLabel: "log-test",
 		Operator: OPERATOR_LOG,
 		StandardClaims: jwt.StandardClaims{
 			ExpiresAt: time.Now().Unix() + 3600*200,
 		},
 	}
+	os.Setenv("JWT_SEC", "111")
+	SecretKey = "111"
 	token, _ := GeneratorToken(claims)
 	fmt.Println(token)
+	a, _ := Auth(token)
+	if a != nil {
+		fmt.Println(a)
+	}
 	//if err == nil {
 	//	u := url.URL{Scheme: "ws", Host: "127.0.0.1:888", Path: "/log"}
 	//	c, _, err := websocket.DefaultDialer.Dial(u.String()+"?id=123&token="+token, nil)

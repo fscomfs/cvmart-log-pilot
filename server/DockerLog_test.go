@@ -1,7 +1,9 @@
 package server
 
 import (
+	"context"
 	"fmt"
+	"log"
 	"os"
 	"testing"
 	"time"
@@ -64,4 +66,27 @@ func TestR(t *testing.T) {
 	fmt.Print("2/3")
 	time.Sleep(1 * time.Second)
 	fmt.Print("3/3\n")
+}
+
+func TestGoContext(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+
+	go func() {
+		for {
+			select {
+			case <-ctx.Done():
+				log.Print("end 1")
+				return
+			default:
+				for {
+					log.Print("exec 1")
+					time.Sleep(time.Second * 1)
+				}
+			}
+		}
+	}()
+	time.Sleep(time.Second * 2)
+	cancel()
+	time.Sleep(time.Second * 3)
+
 }

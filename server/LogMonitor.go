@@ -1,6 +1,8 @@
 package server
 
-import "os"
+import (
+	"os"
+)
 
 type LogMonitor interface {
 	Start(def *ConnectDef) error

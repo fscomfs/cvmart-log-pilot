@@ -11,14 +11,6 @@ import (
 
 var minioClient *minio.Client
 
-func init() {
-	var err error
-	minioClient, err = newMinioClient()
-	if err != nil {
-		//panic(err.Error())
-	}
-}
-
 type MinioLog struct {
 	minioObjectName string `json:"minio_object_name"`
 	bucketName      string `json:"bucket_name"`
@@ -26,6 +18,10 @@ type MinioLog struct {
 }
 
 func (m *MinioLog) Start(def *ConnectDef) error {
+	if minioClient == nil {
+		minioClient, _ = newMinioClient()
+
+	}
 	object, err := minioClient.GetObject(context.Background(), m.bucketName, m.minioObjectName, minio.GetObjectOptions{})
 	if err != nil {
 		def.WriteMsg <- []byte(err.Error() + "\n")

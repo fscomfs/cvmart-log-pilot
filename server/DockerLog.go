@@ -24,6 +24,8 @@ type DockerLog struct {
 	k8sClient  *kubernetes.Clientset
 	closed     bool
 	podLabel   string
+	ctx        context.Context
+	cancel     context.CancelFunc
 }
 
 var dockerClient = make(map[string]*docker.Client)
@@ -53,11 +55,14 @@ func initK8sClient() {
 
 func NewDockerLog(dockerHost string) (LogMonitor, error) {
 	c := GetDockerClient(dockerHost)
+	ctx, cancel := context.WithCancel(context.Background())
 	return &DockerLog{
 		dockerHost: dockerHost,
 		client:     c,
 		k8sClient:  k8sClient,
 		closed:     false,
+		ctx:        ctx,
+		cancel:     cancel,
 	}, nil
 }
 
@@ -96,20 +101,23 @@ func GetPodProcess(status k8sApi.PodStatus) int {
 	return process
 }
 
-func (l *DockerLog) Start(def *ConnectDef) error {
-	ctx := context.Background()
+func (d *DockerLog) Start(def *ConnectDef) error {
 	var containerId string
 	var dockerHost string
-	if def.LogClaims.ContainerId == "" && def.LogClaims.PodLabel != "" && l.k8sClient != nil {
+	if def.LogClaims.ContainerId == "" && def.LogClaims.PodLabel != "" && d.k8sClient != nil {
 		for {
-			if l.closed {
+			if d.closed {
+				log.Printf("DockerLog closed id=%+v", def.Id)
 				return nil
 			}
-			podList, err := k8sClient.CoreV1().Pods("default").List(ctx, v1.ListOptions{
+			podList, err := k8sClient.CoreV1().Pods("default").List(context.Background(), v1.ListOptions{
 				Watch:         false,
 				LabelSelector: "app=" + def.LogClaims.PodLabel,
 			})
+
 			if err != nil || len(podList.Items) == 0 {
+				def.WriteMsg <- []byte("\rWait for task initiation...")
+				time.Sleep(5 * time.Second)
 				continue
 			}
 			pod := podList.Items[0]
@@ -144,17 +152,21 @@ func (l *DockerLog) Start(def *ConnectDef) error {
 		}
 	}
 	log.Printf("start tail container log:%+v", def.LogClaims)
-	if l.client == nil {
-		l.dockerHost = dockerHost
-		l.client = GetDockerClient(l.dockerHost)
+	if d.client == nil {
+		d.dockerHost = dockerHost
+		d.client = GetDockerClient(d.dockerHost)
 	}
-	reader, err := l.client.ContainerLogs(ctx, containerId, types.ContainerLogsOptions{
+	tail := "10000"
+	if def.LogClaims.Tail != "" {
+		tail = def.LogClaims.Tail
+	}
+	reader, err := d.client.ContainerLogs(d.ctx, containerId, types.ContainerLogsOptions{
 		Follow:     true,
-		ShowStderr: false,
+		ShowStderr: true,
 		ShowStdout: true,
-		Tail:       "1000",
+		Tail:       tail,
 		Timestamps: false,
-		Details:    false,
+		Details:    true,
 	})
 	if err != nil {
 		return err
@@ -162,13 +174,15 @@ func (l *DockerLog) Start(def *ConnectDef) error {
 	defer reader.Close()
 	r := bufio.NewReader(reader)
 	var out = ioutil.Discard
-	StdCopy(out, def.WriteMsg, r)
-
+	StdCopy(out, r, def.WriteMsg)
+	log.Printf("tail log process end id=%+v", def.Id)
 	def.WriteMsg <- []byte("log end")
 	return nil
 }
 
-func (l *DockerLog) Close() error {
-	l.closed = true
+func (d *DockerLog) Close() error {
+	d.closed = true
+	d.cancel()
+	log.Printf("close process=%+v", d)
 	return nil
 }

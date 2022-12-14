@@ -12,6 +12,7 @@ type LogClaims struct {
 	Port         string `json:"port"`
 	ContainerId  string `json:"containerId"`
 	Operator     string `json:"operator"`
+	Tail         string `json:"tail"`
 	PodLabel     string `json:"podLabel"`
 	MinioObjName string `json:"minioObjName"`
 	jwt.RegisteredClaims

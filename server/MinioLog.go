@@ -7,6 +7,7 @@ import (
 	"fmt"
 	minio "github.com/minio/minio-go/v7"
 	"github.com/minio/minio-go/v7/pkg/credentials"
+	"io"
 	"os"
 )
 
@@ -36,7 +37,9 @@ func (m *MinioLog) Start(def *ConnectDef) error {
 	for {
 		line, e := r.ReadBytes('\n')
 		if e != nil {
-			def.WriteMsg <- []byte(e.Error() + "\n")
+			if e != io.EOF {
+				def.WriteMsg <- []byte(e.Error() + "\n")
+			}
 			return e
 		}
 		e = json.Unmarshal(line, &j)
@@ -46,7 +49,7 @@ func (m *MinioLog) Start(def *ConnectDef) error {
 		}
 		data := j.(map[string]interface{})
 		if log, ok := data["log"]; ok {
-			def.WriteMsg <- []byte(log.(string) + "\n")
+			def.WriteMsg <- []byte(log.(string))
 		}
 		if m.closed {
 			return nil

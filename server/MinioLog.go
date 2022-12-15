@@ -3,6 +3,7 @@ package server
 import (
 	"bufio"
 	"context"
+	"encoding/json"
 	"fmt"
 	minio "github.com/minio/minio-go/v7"
 	"github.com/minio/minio-go/v7/pkg/credentials"
@@ -31,16 +32,25 @@ func (m *MinioLog) Start(def *ConnectDef) error {
 
 	r := bufio.NewReader(object)
 	defer object.Close()
+	var j interface{}
 	for {
 		line, e := r.ReadBytes('\n')
 		if e != nil {
 			def.WriteMsg <- []byte(e.Error() + "\n")
 			return e
 		}
+		e = json.Unmarshal(line, &j)
+		if e != nil {
+			def.WriteMsg <- []byte(e.Error() + "\n")
+			return e
+		}
+		data := j.(map[string]interface{})
+		if log, ok := data["log"]; ok {
+			def.WriteMsg <- []byte(log.(string) + "\n")
+		}
 		if m.closed {
 			return nil
 		}
-		def.WriteMsg <- line
 	}
 	return nil
 }

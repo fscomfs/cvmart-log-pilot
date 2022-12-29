@@ -34,12 +34,20 @@ __global__ void add(float* x, float * y, float* z, int n)
 
 int checkGpuAvailability(int appNum){
     int deviceCount = 0;
+    //0 成功 1内存溢出无法使用 2 进程冲突 3 检测异常 4 没有GPU 5 INIT_ERROR
     cudaError_t error_id = cudaGetDeviceCount(&deviceCount);
     if (error_id != cudaSuccess) {
       printf("result-cudaGetDeviceCount returned %d\n-> %s\n",
             static_cast<int>(error_id), cudaGetErrorString(error_id));
-      exit(EXIT_FAILURE);
+      std::cout <<"result-Init error "<<"初始化失败"<<std::endl;
+      exit(5);
     }
+    if (deviceCount==0)
+    {  
+       std::cout <<"result-cudaGetDeviceCount error "<<"没有检测到GPU"<<std::endl;
+       exit(4);
+    }
+    
     int dev=0;
     int freeDeviceNum = 0;
     for (dev = 0; dev < deviceCount; ++dev) {
@@ -51,7 +59,7 @@ int checkGpuAvailability(int appNum){
       if (total==0)
       {
          std::cout <<"result-cudaMemGetInfo error index-"<<dev<<",无法获取设备内存信息"<<std::endl;
-         exit(EXIT_FAILURE);
+         exit(1);
       }
       if (total>0&&(total-avail)/total>0.1)
       { 
@@ -62,8 +70,8 @@ int checkGpuAvailability(int appNum){
     }
     if (freeDeviceNum<appNum)
     {
-      std::cout << "result-存在进程冲突可能: " <<appNum<<"/"<< freeDeviceNum << std::endl;
-      exit(EXIT_FAILURE);
+      std::cout << "result-CheckGpu error 存在进程冲突可能: " <<appNum<<"/"<< freeDeviceNum << std::endl;
+      exit(2);
     }
     
     dev=0;
@@ -87,7 +95,6 @@ int checkGpuAvailability(int appNum){
           continue;
       }
       long N = 1 << 20;
-      long memSize = 1<<29;
       long nBytes = N * sizeof(float);
       // 申请host内存
       float *x, *y, *z;
@@ -104,20 +111,20 @@ int checkGpuAvailability(int appNum){
       // 申请device内存
       float *d_x, *d_y, *d_z;
       //申请1G 的内存
-      cudaError_t error_x  = cudaMalloc((void**)&d_x, memSize);
-      std::cout << "申请内存: " <<memSize<< std::endl;
+      cudaError_t error_x  = cudaMalloc((void**)&d_x, nBytes);
+      std::cout << "申请内存: " <<nBytes<< std::endl;
       if (error_x != cudaSuccess) {
           std::cout <<"result-cudaMalloc error index-"<<dev<<",errorInfo:"<<cudaGetErrorString(error_x)<<std::endl;
           exit(EXIT_FAILURE);
       }
       //申请1G 的内存
-      cudaError_t error_y  = cudaMalloc((void**)&d_y, memSize);
+      cudaError_t error_y  = cudaMalloc((void**)&d_y, nBytes);
       if (error_y != cudaSuccess) {
           std::cout <<"result-cudaMalloc error index-"<<dev<<",errorInfo:"<<cudaGetErrorString(error_y)<<std::endl;
           exit(EXIT_FAILURE);
       }
       //申请1G 的内存
-      cudaError_t error_z  = cudaMalloc((void**)&d_z, memSize);
+      cudaError_t error_z  = cudaMalloc((void**)&d_z, nBytes);
       if (error_z != cudaSuccess) {
           std::cout <<"result-cudaMalloc error index-"<<dev<<",errorInfo:"<<cudaGetErrorString(error_z)<<std::endl;
           exit(EXIT_FAILURE);
@@ -158,10 +165,6 @@ int main(int argc, char *argv[])
     }
     printf("appNum:%d\n",appNum);
     printf("gpuInfoFlag:%d\n",gpuInfoFlag);
-    if (appNum>0)
-    {
-        return checkGpuAvailability(appNum);
-    }
-    return 0;
+    return checkGpuAvailability(appNum);
 }
 

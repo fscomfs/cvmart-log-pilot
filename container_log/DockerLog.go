@@ -1,4 +1,4 @@
-package server
+package container_log
 
 import (
 	"bufio"
@@ -35,16 +35,17 @@ func init() {
 	initK8sClient()
 }
 func initK8sClient() {
-	host, port, token := os.Getenv("KUBERNETES_SERVICE_HOST"), os.Getenv("KUBERNETES_SERVICE_PORT"), os.Getenv("KUBERNETES_TOKEN")
-	config := &rest.Config{
-		Host:        "https://" + net.JoinHostPort(host, port),
-		BearerToken: token,
-		//	BearerTokenFile: "/var/run/secrets/kubernetes.io/serviceaccount/token",
-		TLSClientConfig: rest.TLSClientConfig{
-			Insecure: true,
-		},
+	config, err := rest.InClusterConfig()
+	if err != nil {
+		host, port, token := os.Getenv("KUBERNETES_SERVICE_HOST"), os.Getenv("KUBERNETES_SERVICE_PORT"), os.Getenv("KUBERNETES_TOKEN")
+		config = &rest.Config{
+			Host:        "https://" + net.JoinHostPort(host, port),
+			BearerToken: token,
+			TLSClientConfig: rest.TLSClientConfig{
+				Insecure: true,
+			},
+		}
 	}
-
 	// create the clientset
 	clientset, err := kubernetes.NewForConfig(config)
 	if err != nil {

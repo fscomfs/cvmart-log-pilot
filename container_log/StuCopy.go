@@ -1,4 +1,4 @@
-package server // import "github.com/docker/docker/pkg/stdcopy"
+package container_log // import "github.com/docker/docker/pkg/stdcopy"
 
 import (
 	"bytes"
@@ -171,7 +171,7 @@ func StdCopy(dstout io.Writer, src io.Reader, outChan chan []byte) (written int6
 		}
 
 		// Write the retrieved frame (without header)
-		l := make([]byte, (frameSize + stdWriterPrefixLen))
+		l := make([]byte, (frameSize))
 		copy(l, buf[stdWriterPrefixLen:frameSize+stdWriterPrefixLen])
 		outChan <- l
 		nw, ew = out.Write(l)

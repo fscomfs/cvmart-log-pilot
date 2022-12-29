@@ -3,6 +3,7 @@ module github.com/fscomfs/cvmart-log-pilot
 go 1.17
 
 require (
+	github.com/NVIDIA/go-nvml v0.11.6-0
 	github.com/Sirupsen/logrus v1.0.1-0.20170630005420-7dd06bf38e1e
 	github.com/docker/docker v1.4.2-0.20171014114940-f2afa2623594
 	github.com/elastic/go-ucfg v0.5.1

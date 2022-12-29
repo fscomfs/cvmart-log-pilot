@@ -1,4 +1,4 @@
-package server
+package container_log
 
 type Message struct {
 	Type        string `json:"type"`

@@ -1,4 +1,4 @@
-package server
+package container_log
 
 import (
 	"bufio"

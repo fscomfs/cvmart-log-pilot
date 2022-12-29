@@ -42,7 +42,7 @@ func main() {
 		panic(err)
 	}
 
-	go server.LogtHandler()
+	go server.Handler()
 
 	log.Fatal(pilot.Run(string(b), baseDir))
 }

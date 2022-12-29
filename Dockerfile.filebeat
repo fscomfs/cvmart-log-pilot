@@ -7,6 +7,7 @@ RUN apt-get update &&\
 
 COPY build/bin/cvmart-log-pilot-linux-${ARCH} /pilot/pilot
 COPY filebeat-binary/filebeat-linux-${ARCH} /usr/bin/filebeat
+COPY assets/gpu_check/nvidia_gpu_check_amd64 /usr/bin/nvidia_gpu_check
 COPY assets/entrypoint assets/filebeat/ assets/healthz /pilot/
 
 RUN chmod +x /pilot/pilot /pilot/entrypoint /pilot/healthz /pilot/config.filebeat

@@ -142,18 +142,6 @@ int checkGpuAvailability(int appNum){
 }
 
 
-// int gpuInfo(int index){
-//     // size_t avail;
-// 	  // size_t total;
-//     // cudaSetDevice(index);
-//     // cudaMemGetInfo(&avail, &total); 
-//     // std::cout <<"result-GPU-memory:"<<(total-avail)/1024/1024<<"/"<<total/1024/1024<<std::endl;
-//     // sleep(5);
-//     // return 0;
-
-//    // nvmlInitWithFlags();
-// }
-
 int main(int argc, char *argv[])
 {
     int appNum=0;

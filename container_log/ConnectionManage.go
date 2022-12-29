@@ -1,11 +1,10 @@
-package server
+package container_log
 
 import (
 	"bytes"
 	"encoding/json"
 	"github.com/gorilla/websocket"
 	"log"
-	"net/http"
 )
 
 type ConnectHub struct {
@@ -19,14 +18,6 @@ type ConnectDef struct {
 	CloseConn  chan bool
 	Connect    *websocket.Conn
 	LogMonitor LogMonitor
-}
-
-var upgrader = websocket.Upgrader{
-	ReadBufferSize:  1024,
-	WriteBufferSize: 1024,
-	CheckOrigin: func(r *http.Request) bool {
-		return true
-	},
 }
 
 var connectHub = ConnectHub{
@@ -52,30 +43,9 @@ func RegistryConnect(id string, logClaim *LogClaims, conn *websocket.Conn) {
 	c.watch()
 }
 
-func Destroy(id string) {
+func destroy(id string) {
 	connectHub.connects[id].Connect.Close()
 	delete(connectHub.connects, id)
-}
-
-func RequestHandler(w http.ResponseWriter, r *http.Request) {
-	values := r.URL.Query()
-	token := values.Get("token")
-	id := values.Get("id")
-	conn, err := upgrader.Upgrade(w, r, nil)
-	if err != nil {
-		log.Printf("RequestHandler upgrader %+v", err)
-		return
-	}
-	//login auth
-	logClaims, err := Auth(token)
-	if err != nil {
-		conn.WriteMessage(websocket.TextMessage, []byte("bad auth"))
-		conn.WriteMessage(websocket.CloseMessage, []byte(""))
-		conn.Close()
-		return
-	}
-	RegistryConnect(id, logClaims, conn)
-
 }
 
 func (c *ConnectDef) watch() {
@@ -87,7 +57,7 @@ func (c *ConnectDef) watch() {
 				c.CloseConn <- true
 				return
 			}
-			OnMessage(c, messageType, &message)
+			onMessage(c, messageType, &message)
 		}
 
 	}()
@@ -102,7 +72,7 @@ func (c *ConnectDef) watch() {
 				}
 			case close := <-c.CloseConn:
 				if close {
-					OnClose(c)
+					onClose(c)
 					return
 				}
 
@@ -111,9 +81,9 @@ func (c *ConnectDef) watch() {
 	}()
 }
 
-func OnMessage(c *ConnectDef, messageType int, message *[]byte) {
+func onMessage(c *ConnectDef, messageType int, message *[]byte) {
 	if messageType == websocket.CloseMessage {
-		Destroy(c.Id)
+		destroy(c.Id)
 		return
 	}
 	decoder := json.NewDecoder(bytes.NewReader(*message))
@@ -122,25 +92,12 @@ func OnMessage(c *ConnectDef, messageType int, message *[]byte) {
 		log.Printf("message decoder err:%+v", err)
 		return
 	}
-	//if msg.Type == MSG_CONTROLLER {
-	//	var msgBody ConParam
-	//	msgBodyDecoder := json.NewDecoder(bytes.NewReader([]byte(msg.Msg)))
-	//	if err := msgBodyDecoder.Decode(msgBody); err != nil {
-	//		log.Printf("message decoder err:%+v", err)
-	//		return
-	//	}
-	//	if msgBody.operator == CON_TAIL_LOG {
-	//
-	//	}
-	//
-	//}
-
 }
 
-func OnClose(c *ConnectDef) {
+func onClose(c *ConnectDef) {
 	log.Printf("close connect Id:%+v,conn %+v", c.Id, c.LogClaims)
 	if c.LogMonitor != nil {
 		c.LogMonitor.Close()
 	}
-	Destroy(c.Id)
+	destroy(c.Id)
 }

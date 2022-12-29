@@ -48,7 +48,12 @@ int checkGpuAvailability(int appNum){
 	    size_t total;
       cudaMemGetInfo(&avail, &total); 
       std::cout << "result-GPU-memory index-" <<dev<<":"<<(total-avail)/1024/1024<<"/"<<total/1024/1024<< std::endl;
-      if ((total-avail)/total>0.1)
+      if (total==0)
+      {
+         std::cout <<"result-cudaMemGetInfo error index-"<<dev<<",无法获取设备内存信息"<<std::endl;
+         exit(EXIT_FAILURE);
+      }
+      if (total>0&&(total-avail)/total>0.1)
       { 
         //如果过使用量大于 0.1 个百分比 就认为当前这个显卡是有人在使用
       }else{
@@ -63,13 +68,23 @@ int checkGpuAvailability(int appNum){
     
     dev=0;
     for (dev = 0; dev < deviceCount; ++dev){
-      cudaSetDevice(dev);
+      std::cout << "cudaSetDevice: " <<dev<< std::endl;
+      cudaError_t error_d = cudaSetDevice(dev);
+      if (error_d != cudaSuccess) {
+          std::cout <<"result-cudaSetDevice error index-"<<dev<<",errorInfo:"<<cudaGetErrorString(error_d)<<std::endl;
+          exit(EXIT_FAILURE);
+      }
       size_t avail;
 	    size_t total;
       cudaMemGetInfo(&avail, &total); 
+      if (total==0)
+      {
+         std::cout <<"result-cudaMemGetInfo error index-"<<dev<<",无法获取设备内存信息"<<std::endl;
+         exit(EXIT_FAILURE);
+      }
       if ((total-avail)/total>0.1)
       { 
-        continue;
+          continue;
       }
       long N = 1 << 20;
       long memSize = 1<<29;
@@ -90,20 +105,21 @@ int checkGpuAvailability(int appNum){
       float *d_x, *d_y, *d_z;
       //申请1G 的内存
       cudaError_t error_x  = cudaMalloc((void**)&d_x, memSize);
+      std::cout << "申请内存: " <<memSize<< std::endl;
       if (error_x != cudaSuccess) {
-          std::cout <<"result-cudaMalloc error index-"<<dev<<"errorInfo:"<<cudaGetErrorString(error_x)<<std::endl;
+          std::cout <<"result-cudaMalloc error index-"<<dev<<",errorInfo:"<<cudaGetErrorString(error_x)<<std::endl;
           exit(EXIT_FAILURE);
       }
       //申请1G 的内存
       cudaError_t error_y  = cudaMalloc((void**)&d_y, memSize);
       if (error_y != cudaSuccess) {
-          std::cout <<"result-cudaMalloc error index-"<<dev<<"errorInfo:"<<cudaGetErrorString(error_y)<<std::endl;
+          std::cout <<"result-cudaMalloc error index-"<<dev<<",errorInfo:"<<cudaGetErrorString(error_y)<<std::endl;
           exit(EXIT_FAILURE);
       }
       //申请1G 的内存
       cudaError_t error_z  = cudaMalloc((void**)&d_z, memSize);
       if (error_z != cudaSuccess) {
-          std::cout <<"result-cudaMalloc error index-"<<dev<<"errorInfo:"<<cudaGetErrorString(error_z)<<std::endl;
+          std::cout <<"result-cudaMalloc error index-"<<dev<<",errorInfo:"<<cudaGetErrorString(error_z)<<std::endl;
           exit(EXIT_FAILURE);
       }
       // 释放device内存
@@ -119,17 +135,17 @@ int checkGpuAvailability(int appNum){
 }
 
 
-int gpuInfo(int index){
-    // size_t avail;
-	  // size_t total;
-    // cudaSetDevice(index);
-    // cudaMemGetInfo(&avail, &total); 
-    // std::cout <<"result-GPU-memory:"<<(total-avail)/1024/1024<<"/"<<total/1024/1024<<std::endl;
-    // sleep(5);
-    // return 0;
+// int gpuInfo(int index){
+//     // size_t avail;
+// 	  // size_t total;
+//     // cudaSetDevice(index);
+//     // cudaMemGetInfo(&avail, &total); 
+//     // std::cout <<"result-GPU-memory:"<<(total-avail)/1024/1024<<"/"<<total/1024/1024<<std::endl;
+//     // sleep(5);
+//     // return 0;
 
-    nvmlInitWithFlags()
-}
+//    // nvmlInitWithFlags();
+// }
 
 int main(int argc, char *argv[])
 {

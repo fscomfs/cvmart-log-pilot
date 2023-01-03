@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"github.com/fscomfs/cvmart-log-pilot/gpu"
 	"github.com/gorilla/websocket"
+	"log"
 	"net/http"
 	"time"
 )
@@ -20,22 +21,29 @@ func ContainerGpuInfoHandler(w http.ResponseWriter, r *http.Request) {
 	values := r.URL.Query()
 	containerID := values.Get("containerID")
 	gpuInfoExecutor, _ := gpu.GetExecutor()
-	index := gpuInfoExecutor.ContainerDevices(containerID)
+	var index []string
+	if gpuInfoExecutor != nil {
+		index = gpuInfoExecutor.ContainerDevices(containerID)
+	}
 	if len(index) > 0 {
+		log.Printf("device:%+v", index)
 		conn, _ := upgrader.Upgrade(w, r, nil)
 		defer conn.Close()
-		t := time.NewTicker(1 * time.Second)
-		defer t.Stop()
 		for {
-			select {
-			case <-t.C:
-				jsonStr, _ := json.Marshal(gpuInfoExecutor.Info(index))
+
+			if res, error := gpuInfoExecutor.Info(index); error != nil {
+				return
+			} else {
+				jsonStr, _ := json.Marshal(res)
 				err := conn.WriteMessage(websocket.TextMessage, jsonStr)
 				if err != nil {
 					return
 				}
 			}
+
+			time.Sleep(2 * time.Second)
 		}
+
 	} else {
 		w.WriteHeader(http.StatusNoContent)
 	}

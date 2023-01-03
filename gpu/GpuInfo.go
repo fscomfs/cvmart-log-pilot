@@ -4,8 +4,8 @@ import "fmt"
 
 type GpuInfo interface {
 	ContainerDevices(containerID string) []string
-	Info(indexs []string) map[string]InfoObj
-	InfoAll() map[string]InfoObj
+	Info(indexs []string) (map[string]InfoObj, error)
+	InfoAll() (map[string]InfoObj, error)
 }
 
 var executor GpuInfo

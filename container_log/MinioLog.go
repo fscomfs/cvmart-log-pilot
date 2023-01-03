@@ -19,12 +19,12 @@ type MinioLog struct {
 	closed          bool   `json:"closed"`
 }
 
-func (m *MinioLog) Start(def *ConnectDef) error {
+func (m *MinioLog) Start(ctx context.Context, def *ConnectDef) error {
 	if minioClient == nil {
 		minioClient, _ = newMinioClient()
 
 	}
-	object, err := minioClient.GetObject(context.Background(), m.bucketName, m.minioObjectName, minio.GetObjectOptions{})
+	object, err := minioClient.GetObject(ctx, m.bucketName, m.minioObjectName, minio.GetObjectOptions{})
 	if err != nil {
 		def.WriteMsg <- []byte(err.Error() + "\n")
 		m.closed = true

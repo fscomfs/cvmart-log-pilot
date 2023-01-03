@@ -91,7 +91,7 @@ func NewStdWriter(w io.Writer, t StdType) io.Writer {
 // In other words: if `err` is non nil, it indicates a real underlying error.
 //
 // `written` will hold the total number of bytes written to `dstout` and `dsterr`.
-func StdCopy(dstout io.Writer, src io.Reader, outChan chan []byte) (written int64, err error) {
+func StdCopy(dstout io.Writer, src io.Reader, outFun func([]byte)) (written int64, err error) {
 	var (
 		buf       = make([]byte, startingBufLen)
 		bufLen    = len(buf)
@@ -173,7 +173,7 @@ func StdCopy(dstout io.Writer, src io.Reader, outChan chan []byte) (written int6
 		// Write the retrieved frame (without header)
 		l := make([]byte, (frameSize))
 		copy(l, buf[stdWriterPrefixLen:frameSize+stdWriterPrefixLen])
-		outChan <- l
+		outFun(logMessage(l))
 		nw, ew = out.Write(l)
 		if ew != nil {
 			return 0, ew

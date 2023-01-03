@@ -16,5 +16,4 @@ HEALTHCHECK CMD /pilot/healthz
 
 WORKDIR /pilot/
 ENV PILOT_TYPE=filebeat
-ENV LD_LIBRARY_PATH=/host/usr/local/lib:/host/usr/lib/:
 ENTRYPOINT ["python3","/pilot/entrypoint"]

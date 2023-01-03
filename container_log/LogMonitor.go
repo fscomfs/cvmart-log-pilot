@@ -1,11 +1,12 @@
 package container_log
 
 import (
+	"context"
 	"os"
 )
 
 type LogMonitor interface {
-	Start(def *ConnectDef) error
+	Start(ctx context.Context, def *ConnectDef) error
 	Close() error
 }
 

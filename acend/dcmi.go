@@ -1,0 +1,5 @@
+package acend
+
+func Init() {
+
+}

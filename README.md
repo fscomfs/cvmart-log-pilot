@@ -1,91 +1,93 @@
-log-pilot
-=========
+cvmart_logs_custom_config=trackNo=uuid;minioObjName=uuid/name.log
+cvmart_logs_minioObjName=/uuid/name.log
+cvmart_logs_trackNo=uuid
+cvmart_logs_limitSize=50000
 
-[![CircleCI](https://circleci.com/gh/AliyunContainerService/log-pilot.svg?style=svg)](https://circleci.com/gh/AliyunContainerService/log-pilot)
-[![Go Report Card](https://goreportcard.com/badge/github.com/AliyunContainerService/log-pilot)](https://goreportcard.com/report/github.com/AliyunContainerService/log-pilot)
+cvmart_log_skip
 
-`log-pilot` is an awesome docker log tool. With `log-pilot` you can collect logs from docker hosts and send them to your centralized log system such as elasticsearch, graylog2, awsog and etc. `log-pilot` can collect not only docker stdout but also log file that inside docker containers.
 
-Try it
-======
+DOCKER_HOST
+DOCKER_API_VERSION
 
-Prerequisites:
 
-- docker-compose >= 1.6
-- Docker Engine >= 1.10
 
-```
-# download log-pilot project
-git clone git@github.com:AliyunContainerService/log-pilot.git
-# build log-pilot image
-cd log-pilot/ && ./build-image.sh
-# quick start
-cd quickstart/ && ./run
-```
 
-Then access kibana under the tips. You will find that tomcat's has been collected and sended to kibana.
+cvmart_log_skip
 
-Create index:
-![kibana](quickstart/Kibana.png)
 
-Query the logs:
-![kibana](quickstart/Kibana2.png)
+docker run -d --env cvmart_logs_custom_config="cvmart.fields.trackNo=uuid2;cvmart.fields.limitSize=50000;cvmart.fields.minioObjName=/uuid2/name2.log" --env PILOT_LOG_PREFIX=cvmart --env cvmart_logs_cvmart=stdout -v /cvmart-log/:/log a8780b506fa4  bash -c "chmod  +x /log/log.sh && bash /log/log.sh"
 
-Quickstart
-==========
+docker run -d --env cvmart_logs_custom_config="cvmart.fields.trackNo=uuid3;cvmart.fields.limitSize=50000;cvmart.fields.minioObjName=/uuid3/name2.log" --env PILOT_LOG_PREFIX=cvmart --env cvmart_logs_cvmart=stdout -v /cvmart-log/:/log a8780b506fa4  bash -c "chmod  +x /log/log.sh && bash /log/log.sh"
 
-### Run pilot
 
-```
-docker run --rm -it \
-    -v /var/run/docker.sock:/var/run/docker.sock \
-    -v /etc/localtime:/etc/localtime \
-    -v /:/host:ro \
-    --cap-add SYS_ADMIN \
-    registry.cn-hangzhou.aliyuncs.com/acs/log-pilot:0.9.5-filebeat
-```
+-c /cvmart-log/beats/filebeat/filebeat.yml
 
-### Run applications whose logs need to be collected
 
-Open a new terminal, run the application. With tomcat for example:
+/etc/filebeat/filebeat.yml
 
-```
-docker run -it --rm  -p 10080:8080 \
-    -v /usr/local/tomcat/logs \
-    --label aliyun.logs.catalina=stdout \
-    --label aliyun.logs.access=/usr/local/tomcat/logs/localhost_access_log.*.txt \
-    tomcat
-```
 
-Now watch the output of log-pilot. You will find that log-pilot get all tomcat's startup logs. If you access tomcat with your broswer, access logs in `/usr/local/tomcat/logs/localhost_access_log.\*.txt` will also be displayed in log-pilot's output.
 
-More Info: [Fluentd Plugin](docs/fluentd/docs.md) and [Filebeat Plugin](docs/filebeat/docs.md)
+/data/filebeat/filebeat/log.json
 
-Feature
-========
 
-- Support both [fluentd plugin](docs/fluentd/docs.md) and [filebeat plugin](docs/filebeat/docs.md). You don't need to create new fluentd or filebeat process for every docker container.
-- Support both stdout and log files. Either docker log driver or logspout can only collect stdout.
-- Declarative configuration. You need do nothing but declare the logs you want to collect.
-- Support many log management: elastichsearch, graylog2, awslogs and more.
-- Tags. You could add tags on the logs collected, and later filter by tags in log management.
+BUILD_DIR?=$(shell pwd)/build
+gox -osarch "linux/amd64 linux/arm64 linux/arm" -output={{.Dir}}_{{.OS}}_{{.Arch}}
 
-Build log-pilot
-===================
+export PILOT_TYPE=filebeat
+export PILOT_LOG_PREFIX=cvmart
+export JWT_SEC="111"
+export KUBERNETES_SERVICE_HOST=192.168.1.131
+export KUBERNETES_SERVICE_PORT=6443
+export KUBERNETES_TOKEN=
+export MINIO_URL="192.168.1.175:9000"
+export MINIO_USERNAME=admin
+export MINIO_PASSWORD="admin123"
+export BUCKET="cvmart-log"
+log-pilot --template="/config/filebeat/filebeat.tpl" --base="/"
 
-Prerequisites:
 
-- Go >= 1.6
+docker  build --build-arg ARCH="amd64" -t 192.168.1.186:8099/evtrain/cvmart-log:v1 -f Dockerfile.filebeat .
 
-```
-go get github.com/AliyunContainerService/log-pilot
-cd $GOPATH/github.com/AliyunContainerService/log-pilot
-# This will create a new docker image named log-pilot:latest
-./build-image.sh
-```
+docker buildx build -t 192.168.1.186:8099/evtrain/cvmart-log:v1 --platform linux/amd64,linux/arm64 -f Dockerfile.filebeat .
 
-Contribute
-==========
 
-You are welcome to make new issues and pull reuqests.
+docker run -it --rm -d \
+--env PILOT_TYPE=filebeat \
+--env PILOT_LOG_PREFIX=cvmart \
+--env JWT_SEC="111" \
+--env KUBERNETES_SERVICE_HOST=192.168.1.131 \
+--env KUBERNETES_SERVICE_PORT=6443 \
+--env KUBERNETES_TOKEN="eyJhbGciOiJSUzI1NiIsImtpZCI6Ii1EQkxmRVlFMnFBNm1xcHk3U2NhSm0xUGhaZnlsT2dZeFNIZUFRZzBLU0UifQ.eyJpc3MiOiJrdWJlcm5ldGVzL3NlcnZpY2VhY2NvdW50Iiwia3ViZXJuZXRlcy5pby9zZXJ2aWNlYWNjb3VudC9uYW1lc3BhY2UiOiJrdWJlLXN5c3RlbSIsImt1YmVybmV0ZXMuaW8vc2VydmljZWFjY291bnQvc2VjcmV0Lm5hbWUiOiJhZG1pbi10b2tlbi14bjh0cCIsImt1YmVybmV0ZXMuaW8vc2VydmljZWFjY291bnQvc2VydmljZS1hY2NvdW50Lm5hbWUiOiJhZG1pbiIsImt1YmVybmV0ZXMuaW8vc2VydmljZWFjY291bnQvc2VydmljZS1hY2NvdW50LnVpZCI6IjYyOTQ0YmQwLTNhN2MtNDNlYy05MTYyLTc3ZGNjYTEwMDU3NyIsInN1YiI6InN5c3RlbTpzZXJ2aWNlYWNjb3VudDprdWJlLXN5c3RlbTphZG1pbiJ9.JCyjrKbVMVis28DIAjp1L9BwlqT3XXGrTHH_oUN_4Xu6gcOP2GOokg9S66CXZR7CSPTtTWbpRFHu3KyoISQFl5TxatDGrHvEjbMtcugwHBTW6yrfxJs_woN4QphlFq5wBzmwcpvC1MXuj3VTIRvabnivfL3wa2qw3iccP8eYSPpaySVKChu60WW_oYMrvVOL3PG01DlWY2PuVS6-uHliCal5_lY22VWKo8AROpoe8tWVa5YEeY45LEe9bsK-WXqY9OweN3PLOGELpjAeY5wc5GJCsACm9Jvv43CfuGopz7rKD005dlfojY4GvF9IVnEMSXFtv0ZtDRSMwPqECubsnQ" \
+--env MINIO_URL="192.168.1.175:9000" \
+--env MINIO_USERNAME="admin" \
+--env MINIO_PASSWORD="admin123" \
+--env BUCKET="cvmart-log" \
+-v /var/run/docker.sock:/var/run/docker.sock \
+-v /dev-docker:/dev-docker \
+-v /log-monitor/out:/out \
+-v /log-monitor/config:/config \
+-p 888:888 \
+--name cvmart-log \
+192.168.1.186:8099/evtrain/cvmart-log:v1
+
+
+
+
+docker images|grep none|awk '{print $3}'|xargs -I {} docker rmi {} -f
+
+
+
+docker manifest create  192.168.1.186:8099/evtrain/cvmart-log:v1 \
+192.168.1.186:8099/evtrain/cvmart-log-amd64:v1 \
+192.168.1.186:8099/evtrain/cvmart-log-arm64:v1
+
+
+docker manifest annotate 192.168.1.186:8099/evtrain/cvmart-log:v1 \
+192.168.1.186:8099/evtrain/cvmart-log-amd64:v1 --os linux --arch amd64
+
+docker manifest annotate 192.168.1.186:8099/evtrain/cvmart-log:v1 \
+192.168.1.186:8099/evtrain/cvmart-log-arm:v1 --os linux --arch arm64
+
+
+
 

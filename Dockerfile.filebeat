@@ -6,7 +6,7 @@ RUN apt-get update &&\
     apt-get install -y vim
 
 COPY build/bin/cvmart-log-pilot-linux-${TARGETARCH} /pilot/pilot
-COPY filebeat-binary/filebeat-linux-${TARGETARCH} /usr/bin/filebeat
+COPY filebeat-binary/filebeat_linux_${TARGETARCH} /usr/bin/filebeat
 COPY assets/gpu_check/nvidia_gpu_check_amd64 /usr/bin/nvidia_gpu_check
 COPY assets/entrypoint assets/filebeat/ assets/healthz /pilot/
 

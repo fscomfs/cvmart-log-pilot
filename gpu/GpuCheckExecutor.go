@@ -5,6 +5,7 @@ import (
 	"bytes"
 	"fmt"
 	"io"
+	"log"
 	"os/exec"
 	"strings"
 )
@@ -30,7 +31,7 @@ func CheckGpu(appNum string) (int, error) {
 		if e2 != nil && e2 == io.EOF {
 			break
 		}
-		print(res)
+		log.Printf("nvidia_gpu_check exec result:%+v", res)
 		if strings.Contains(res, "error") {
 			return status, fmt.Errorf(res)
 		}

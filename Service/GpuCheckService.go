@@ -3,13 +3,9 @@ package Service
 import (
 	"encoding/json"
 	"github.com/fscomfs/cvmart-log-pilot/gpu"
+	"github.com/fscomfs/cvmart-log-pilot/utils"
 	"net/http"
 )
-
-type CheckRes struct {
-	Msg    string `json:"msg"`
-	Status int    `json:"status"`
-}
 
 func CheckGpuHandler(w http.ResponseWriter, r *http.Request) {
 	values := r.URL.Query()
@@ -19,10 +15,12 @@ func CheckGpuHandler(w http.ResponseWriter, r *http.Request) {
 	if error != nil {
 		msg = error.Error()
 	}
-	res := CheckRes{
-		Msg:    msg,
+	res := utils.BaseResult{
+		Code:   utils.SUCCESS_CODE,
 		Status: status,
+		Msg:    msg,
 	}
+	w.Header().Set("Content-Type", "application-json")
 	rej, _ := json.Marshal(res)
 	w.Write(rej)
 }

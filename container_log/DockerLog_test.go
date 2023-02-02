@@ -3,7 +3,6 @@ package container_log
 import (
 	"context"
 	"fmt"
-	"github.com/fscomfs/cvmart-log-pilot/server"
 	"log"
 	"os"
 	"testing"
@@ -15,7 +14,7 @@ func TestTailLog(t *testing.T) {
 	if err != nil {
 
 	}
-	c := &server.ConnectDef{
+	c := &ConnectDef{
 		Connect:  nil,
 		WriteMsg: make(chan []byte),
 	}
@@ -40,15 +39,14 @@ func TestLog(t *testing.T) {
 
 	}
 	initK8sClient()
-	c := &server.ConnectDef{
+	c := &ConnectDef{
 		Id: "111",
 		LogClaims: &LogClaims{
 			PodLabel: "log-test",
 		},
-		WriteMsg:  make(chan []byte),
-		CloseConn: make(chan bool),
+		WriteMsg: make(chan []byte),
 	}
-	server.connectHub.connects["111"] = c
+	connectHub.connects["111"] = c
 	defer cLog.Close()
 	go func() {
 		for {
@@ -58,16 +56,15 @@ func TestLog(t *testing.T) {
 			}
 		}
 	}()
-	cLog.Start(c)
+	cLog.Start(context.Background(), c)
 
 }
 
 func TestR(t *testing.T) {
-	fmt.Print("1/3")
-	time.Sleep(1 * time.Second)
-	fmt.Print("2/3")
-	time.Sleep(1 * time.Second)
-	fmt.Print("3/3\n")
+	s := "12345678"
+	w := s[:2] + "ss" + s[2:]
+	fmt.Printf(w)
+
 }
 
 func TestGoContext(t *testing.T) {

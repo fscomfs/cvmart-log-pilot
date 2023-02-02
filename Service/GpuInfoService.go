@@ -30,7 +30,6 @@ func ContainerGpuInfoHandler(w http.ResponseWriter, r *http.Request) {
 		conn, _ := upgrader.Upgrade(w, r, nil)
 		defer conn.Close()
 		for {
-
 			if res, error := gpuInfoExecutor.Info(index); error != nil {
 				return
 			} else {
@@ -40,7 +39,6 @@ func ContainerGpuInfoHandler(w http.ResponseWriter, r *http.Request) {
 					return
 				}
 			}
-
 			time.Sleep(2 * time.Second)
 		}
 

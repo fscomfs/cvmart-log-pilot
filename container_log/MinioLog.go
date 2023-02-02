@@ -5,13 +5,12 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/fscomfs/cvmart-log-pilot/utils"
 	minio "github.com/minio/minio-go/v7"
 	"github.com/minio/minio-go/v7/pkg/credentials"
 	"io"
 	"os"
 )
-
-var minioClient *minio.Client
 
 type MinioLog struct {
 	minioObjectName string `json:"minio_object_name"`
@@ -20,11 +19,8 @@ type MinioLog struct {
 }
 
 func (m *MinioLog) Start(ctx context.Context, def *ConnectDef) error {
-	if minioClient == nil {
-		minioClient, _ = newMinioClient()
 
-	}
-	object, err := minioClient.GetObject(ctx, m.bucketName, m.minioObjectName, minio.GetObjectOptions{})
+	object, err := utils.MinioClient.GetObject(ctx, m.bucketName, m.minioObjectName, minio.GetObjectOptions{})
 	if err != nil {
 		def.WriteMsg <- []byte(err.Error() + "\n")
 		m.closed = true

@@ -7,7 +7,7 @@ import (
 	"fmt"
 	"github.com/docker/docker/api/types"
 	docker "github.com/docker/docker/client"
-	"github.com/fscomfs/cvmart-log-pilot/util"
+	"github.com/fscomfs/cvmart-log-pilot/utils"
 	"github.com/gorilla/websocket"
 	"io"
 	"io/ioutil"
@@ -77,7 +77,6 @@ func initK8sClient() {
 
 func NewDockerLog(dockerHost string) (LogMonitor, error) {
 	c := GetDockerClient(dockerHost)
-
 	return &DockerLog{
 		dockerHost: dockerHost,
 		client:     c,
@@ -88,18 +87,11 @@ func NewDockerLog(dockerHost string) (LogMonitor, error) {
 
 func GetDockerClient(dockerHost string) (client *docker.Client) {
 	var c *docker.Client
-	var err error
 	if _, ok := dockerClient[dockerHost]; ok {
 		c = dockerClient[dockerHost]
 	} else {
-		if dockerHost != "" {
-			if !strings.HasPrefix(dockerHost, "http://") {
-				dockerHost = "http://" + dockerHost
-			}
-			c, err = docker.NewClient(dockerHost, "", nil, nil)
-			if err != nil {
-				return nil
-			}
+		c = utils.NewDockerClient(dockerHost)
+		if c != nil {
 			dockerClient[dockerHost] = c
 		}
 	}
@@ -185,7 +177,7 @@ func (d *DockerLog) Start(ctx context.Context, def *ConnectDef) error {
 	}
 	go func() {
 		for {
-			h, _ := containerGpuInfo(ctx, strings.Split(d.dockerHost, ":")[0]+fmt.Sprintf(":%d", util.ServerPort), containerId, func(res []byte) {
+			h, _ := containerGpuInfo(ctx, strings.Split(d.dockerHost, ":")[0]+fmt.Sprintf(":%d", utils.ServerPort), containerId, func(res []byte) {
 				def.write(gpuMessage(res))
 			})
 			if !h {
@@ -233,7 +225,7 @@ func (d *DockerLog) Close() error {
 }
 
 func containerGpuInfo(ctx context.Context, host string, containerID string, handler func(res []byte)) (bool, error) {
-	u := url.URL{Scheme: "ws", Host: host, Path: "/api/containerGpuInfo"}
+	u := url.URL{Scheme: "ws", Host: host, Path: utils.API_CONTAINERGPUINFO}
 	c, r, err := websocket.DefaultDialer.Dial(u.String()+"?containerID="+containerID, nil)
 	if r.StatusCode == http.StatusNoContent {
 		return false, fmt.Errorf("not content")

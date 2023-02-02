@@ -33,7 +33,6 @@ func AllDeviceInfo() (map[int32]AtlasInfo, error) {
 			var info AtlasInfo
 			var putilization_rate C.uint
 			var memInfo C.struct_dsmi_memory_info_stru
-			fmt.Println(v)
 			C.dsmi_get_memory_info(C.int(v), &memInfo)
 			s := C.long(memInfo.utiliza) * C.long(memInfo.memory_size) / 100.0
 			C.dsmi_get_device_utilization_rate(C.int(v), C.int(2), &putilization_rate)

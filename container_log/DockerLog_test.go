@@ -9,23 +9,39 @@ import (
 	"time"
 )
 
+func init1() {
+	os.Setenv("JWT_SEC", "111")
+
+}
 func TestTailLog(t *testing.T) {
-	_, err := NewDockerLog("http://localhost:2375")
+	init1()
+	l, err := NewDockerLog("http://localhost:2375")
 	if err != nil {
 
 	}
+	logClaims := &LogClaims{
+		ContainerId: "4d07f21edd9c",
+		Host:        "localhost",
+		Port:        "2375",
+		Operator:    "log",
+		Tail:        "50000",
+	}
+	GeneratorToken(logClaims)
 	c := &ConnectDef{
-		Connect:  nil,
-		WriteMsg: make(chan []byte),
+		Connect:   nil,
+		LogClaims: logClaims,
+		WriteMsg:  make(chan []byte),
 	}
 	go func() {
 		for {
 			select {
-			case l := <-c.WriteMsg:
-				fmt.Print(l)
+			case s := <-c.WriteMsg:
+				fmt.Print(string(s))
 			}
 		}
 	}()
+	l.Start(context.Background(), c)
+
 }
 func init2() {
 	os.Setenv("KUBERNETES_SERVICE_HOST", "192.168.1.131")

@@ -14,6 +14,7 @@ func CheckGpuHandler(w http.ResponseWriter, r *http.Request) {
 	msg := ""
 	if error != nil {
 		msg = error.Error()
+		status = 5
 	}
 	res := utils.BaseResult{
 		Code:   utils.SUCCESS_CODE,

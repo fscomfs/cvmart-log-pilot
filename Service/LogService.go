@@ -14,6 +14,8 @@ import (
 	"io/ioutil"
 	"log"
 	"net/http"
+	"path/filepath"
+	"strings"
 )
 
 type ConnectHub struct {
@@ -70,8 +72,19 @@ func DownloadLogHandler(w http.ResponseWriter, r *http.Request) {
 		}
 	}()
 	if objByte, error := base64.StdEncoding.DecodeString(obj); error == nil {
-		object, err := utils.MinioClient.GetObject(r.Context(), utils.Bucket, string(objByte), minio.GetObjectOptions{})
-		if err != nil {
+		objName := string(objByte)
+		if !strings.HasPrefix(objName, "/") {
+			objName = "/" + objName
+		}
+		objName = strings.Trim(objName, "\n")
+		_, fileName := filepath.Split(objName)
+		if fileName != "" {
+			w.Header().Set("content-Disposition", fmt.Sprintf("attachment;filename=%s", fileName))
+		} else {
+			w.Header().Set("content-Disposition", fmt.Sprintf("attachment;filename=%s", "cvmart-log.log"))
+		}
+		object, err := utils.MinioClient.GetObject(r.Context(), utils.Bucket, objName, minio.GetObjectOptions{})
+		if err == nil {
 			r := bufio.NewReader(object)
 			defer object.Close()
 			var j interface{}
@@ -104,11 +117,12 @@ func UploadLogByTrackNo(w http.ResponseWriter, r *http.Request) {
 		//localhost
 		if resp, err := utils.FileBeatClient.Get(utils.FileBeatUpload + "?trackNo=" + trackNo); err == nil {
 			content, _ := ioutil.ReadAll(resp.Body)
-			w.Write(content)
 			re := string(content)
 			if re == "1" { //success
+				utils.SUCCESS_RES("success", re, w)
 				log.Printf("upload success trackNo=%+v", trackNo)
 			} else { //fail
+				utils.SUCCESS_RES("fail", re, w)
 				log.Printf("upload fail trackNo=%+v", trackNo)
 			}
 		} else {

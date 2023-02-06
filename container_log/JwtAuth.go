@@ -5,8 +5,6 @@ import (
 	"os"
 )
 
-var SecretKey = os.Getenv("JWT_SEC")
-
 type LogClaims struct {
 	Host         string `json:"host"`
 	Port         string `json:"port"`
@@ -19,6 +17,7 @@ type LogClaims struct {
 }
 
 func Auth(token string) (*LogClaims, error) {
+	var SecretKey = os.Getenv("JWT_SEC")
 	tokenClaims, err := jwt.ParseWithClaims(token, &LogClaims{}, func(token *jwt.Token) (interface{}, error) {
 		return []byte(SecretKey), nil
 	})
@@ -32,6 +31,7 @@ func Auth(token string) (*LogClaims, error) {
 }
 
 func GeneratorToken(claims *LogClaims) (string, error) {
+	var SecretKey = os.Getenv("JWT_SEC")
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
 	return token.SignedString([]byte(SecretKey))
 }

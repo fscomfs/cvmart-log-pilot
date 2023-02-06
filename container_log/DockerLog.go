@@ -177,7 +177,7 @@ func (d *DockerLog) Start(ctx context.Context, def *ConnectDef) error {
 	}
 	go func() {
 		for {
-			h, _ := containerGpuInfo(ctx, strings.Split(d.dockerHost, ":")[0]+fmt.Sprintf(":%d", utils.ServerPort), containerId, func(res []byte) {
+			h, _ := containerGpuInfo(ctx, strings.Split(dockerHost, ":")[0]+fmt.Sprintf(":%d", utils.ServerPort), containerId, func(res []byte) {
 				def.write(gpuMessage(res))
 			})
 			if !h {
@@ -225,12 +225,18 @@ func (d *DockerLog) Close() error {
 }
 
 func containerGpuInfo(ctx context.Context, host string, containerID string, handler func(res []byte)) (bool, error) {
+	defer func() {
+		if err := recover(); err != nil {
+			log.Printf("containerGpuInfo error:%+v", err)
+		}
+	}()
 	u := url.URL{Scheme: "ws", Host: host, Path: utils.API_CONTAINERGPUINFO}
 	c, r, err := websocket.DefaultDialer.Dial(u.String()+"?containerID="+containerID, nil)
-	if r.StatusCode == http.StatusNoContent {
-		return false, fmt.Errorf("not content")
-	}
 	if err != nil {
+		if r != nil && r.StatusCode == http.StatusNoContent {
+			return false, fmt.Errorf("not content")
+		}
+		log.Printf("containerGpuInfo err:%+v", err)
 		return true, err
 	}
 	defer c.Close()
@@ -252,17 +258,21 @@ func containerGpuInfo(ctx context.Context, host string, containerID string, hand
 }
 
 func containerResourceInfo(ctx context.Context, client *docker.Client, containerID string, handlerCallback func(res []byte)) (bool, error) {
+	defer func() {
+		if err := recover(); err != nil {
+			log.Printf("containerResourceInfo err %+v", err)
+		}
+	}()
 	var (
 		previousCPU    uint64
 		previousSystem uint64
 	)
 	res, err := client.ContainerStats(ctx, containerID, true)
-	defer res.Body.Close()
 	if err != nil {
 		return false, err
 	}
+	defer res.Body.Close()
 	dec := json.NewDecoder(res.Body)
-
 	for {
 		select {
 		case <-ctx.Done():

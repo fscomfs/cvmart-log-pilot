@@ -64,7 +64,7 @@ func DownloadLogHandler(w http.ResponseWriter, r *http.Request) {
 	obj := values.Get("obj")
 	w.Header().Set("Content-Type", "application/octet-stream")
 	w.Header().Set("content-Disposition", fmt.Sprintf("attachment;filename=%s", obj+".log"))
-	go func() {
+	defer func() {
 		if err := recover(); err != nil {
 			log.Printf("download log error %+v", err)
 		}

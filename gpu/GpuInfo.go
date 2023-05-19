@@ -1,6 +1,11 @@
 package gpu
 
-import "fmt"
+import (
+	"fmt"
+	docker "github.com/docker/docker/client"
+	"log"
+	"os"
+)
 
 type GpuInfo interface {
 	ContainerDevices(containerID string) []string
@@ -9,6 +14,19 @@ type GpuInfo interface {
 }
 
 var executor GpuInfo
+var DockerClient *docker.Client
+
+func init() {
+	if os.Getenv("DOCKER_API_VERSION") == "" {
+		os.Setenv("DOCKER_API_VERSION", "1.23")
+	}
+	client, err := docker.NewEnvClient()
+	if err != nil {
+		log.Printf("%+v", err)
+	} else {
+		DockerClient = client
+	}
+}
 
 type InfoObj struct {
 	Total   uint64 `json:"total"`
@@ -23,4 +41,8 @@ func GetExecutor() (GpuInfo, error) {
 		return nil, fmt.Errorf("not hava executor")
 	}
 	return executor, nil
+}
+
+func SetExecutor(e GpuInfo) {
+	executor = e
 }

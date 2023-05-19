@@ -1,11 +1,9 @@
 package container_log
 
 import (
-	"github.com/golang-jwt/jwt/v4"
+	"github.com/fscomfs/cvmart-log-pilot/config"
 	"log"
-	"os"
 	"testing"
-	"time"
 )
 
 func TestAuth(t *testing.T) {
@@ -13,18 +11,14 @@ func TestAuth(t *testing.T) {
 }
 
 func TestGeneratorToken(t *testing.T) {
-	claims := &LogClaims{
+	claims := LogParam{
 		Host:        "localhost",
-		Port:        "2375",
 		Operator:    OPERATOR_LOG,
 		Tail:        "50000",
-		ContainerId: "4d07f21edd9c",
-		RegisteredClaims: jwt.RegisteredClaims{
-			ExpiresAt: jwt.NewNumericDate(time.Now().Add(time.Second * 5000)),
-		},
+		ContainerId: "a2e31b25d36e",
 	}
-	os.Setenv("JWT_SEC", "111")
-	auth, err := GeneratorToken(claims)
+	config.ParseFromFile("/etc/cvmart/daemon-config.json")
+	auth, err := GeneratorToken(claims, 100)
 	if err != nil {
 		t.Fatalf("GeneratorToken err:%+v", err)
 	}

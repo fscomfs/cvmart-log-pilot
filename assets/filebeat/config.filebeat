@@ -4,8 +4,7 @@ set -e
 
 FILEBEAT_CONFIG=/config/filebeat/filebeat.yml
 if [ -f "$FILEBEAT_CONFIG" ]; then
-    echo "$FILEBEAT_CONFIG has been existed"
-    exit
+    rm -f /config/filebeat/filebeat.yml
 fi
 
 mkdir -p /config/filebeat/prospectors.d

@@ -91,7 +91,6 @@ func (p *PilotSuite) TestRender(c *check.C) {
 			HostDir: "/path/to/world",
 		},
 	}
-	os.Setenv(ENV_PILOT_TYPE, PILOT_FILEBEAT)
 	pilot, err := New(template, "/")
 	c.Assert(err, check.IsNil)
 	_, err = pilot.render("id-1111", map[string]string{}, configs)

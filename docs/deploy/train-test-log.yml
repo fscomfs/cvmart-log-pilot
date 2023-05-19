@@ -1,0 +1,200 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  labels:
+    app: project-705-instance-1555-train-101196
+  name: project-705-instance-1555-train-101196
+  namespace: default
+spec:
+  template:
+    metadata:
+      labels:
+        app: project-705-instance-1555-train-101196
+    spec:
+      containers:
+      - args:
+        - '( (curl --retry 5 -s -d "{''remark'':'''',''is_success'':1,''cmd_type'':''containers_pre_command'',''data'':{''bill'':true}}"
+          -H ''Content-Type: application/json'' http://192.168.1.131:8000/cvmart-trains/api/ft/xyz-train/callback/cmd/1011196)
+          || (curl --retry 5 -s -d "{''remark'':'''',''is_success'':0,''cmd_type'':''containers_pre_command'',''data'':{''bill'':true}}"
+          -H ''Content-Type: application/json'' http://192.168.1.131:8000/cvmart-trains/api/ft/xyz-train/callback/cmd/1011196
+          && exit 1) ) && (( cd / && wget -q http://192.168.1.175:9000/cvmart-business/model-save.sh
+          && printf ''#!/bin/bash\nbash /model-save.sh &\n'' > /model-save-wrapper.sh
+          && curl --retry 5 -s -d "{''remark'':''cd / && wget -q http://192.168.1.175:9000/cvmart-business/model-save.sh'',''is_success'':1,''cmd_type'':''containers_post_command'',''data'':[]}"
+          -H ''Content-Type: application/json'' http://192.168.1.131:8000/cvmart-trains/api/ft/xyz-train/callback/cmd/1011196)
+          || (curl --retry 5 -s -d "{''remark'':''cd / && wget -q http://192.168.1.175:9000/cvmart-business/model-save.sh'',''is_success'':0,''cmd_type'':''containers_post_command'',''data'':[]}"
+          -H ''Content-Type: application/json'' http://192.168.1.131:8000/cvmart-trains/api/ft/xyz-train/callback/cmd/1011196
+          && exit 1) ) && ( ((bash /project/train/src_repo/start_train.sh; tar -cf
+          /tmp/models/models_backup.tar -C /project/train/models .) && curl --retry
+          5 -s -d "{''remark'':''(bash /project/train/src_repo/start_train.sh; tar
+          -cf /tmp/models/models_backup.tar -C /project/train/models .)'',''is_success'':1,''cmd_type'':''containers_user_command'',''data'':{''train_complete'':true}}"
+          -H ''Content-Type: application/json'' http://192.168.1.131:8000/cvmart-trains/api/ft/xyz-train/callback/cmd/1011196)
+          || (curl --retry 5 -s -d "{''remark'':''(bash /project/train/src_repo/start_train.sh;
+          tar -cf /tmp/models/models_backup.tar -C /project/train/models .)'',''is_success'':0,''cmd_type'':''containers_user_command'',''data'':{''train_complete'':true}}"
+          -H ''Content-Type: application/json'' http://192.168.1.131:8000/cvmart-trains/api/ft/xyz-train/callback/cmd/1011916
+          && exit 1) ) && sleep 86400'
+        command:
+        - /bin/sh
+        - -c
+        env:
+        - name: EV_ENABLE_UPLOAD_WRONG_IMAGE_SERVICE
+          value: "false"
+        - name: aliyun_logs_jsj-stdout
+          value: stdout
+        - name: BASE_IMAGE_NAME
+          value: 192.168.1.186:8099/evtrain/ubuntu18.04-cuda11.1-cudnn8-devel-train-test-pytorch1.10.0-openvino2021r3-workspace-base:v1.2
+        - name: MODEL_SAVE_TOP_PERCENT
+          value: "1"
+        - name: MODELS_DIR
+          value: /project/train/models
+        - name: MODEL_SAVE_ICE_CONFIG
+          value: /project/config/ice.config
+        - name: TRAIN_EPOCHS
+          value: "1"
+        - name: TRAIN_BATCH_SIZE
+          value: "1"
+        - name: FASTDFS_ICE_ENDPOINT
+          value: FDFS:default -h 192.168.1.131 -p 11000 -t 3000
+        - name: CALLBACK_URL
+          value: http://192.168.1.131:8000/cvmart-trains/api/ft/xyz-train/callback/model/101196
+        - name: TRAIN_PLOT_CALLBACK_URL
+          value: http://192.168.1.131:8000/cvmart-trains/api/ft/xyz-train/callback/plot/101196
+        - name: MODEL_SAVE_QUOTA_M
+          value: "10737418240"
+        - name: MODEL_SAVE_QUOTA_USED
+          value: "384540672"
+        - name: MODEL_SAVE_QUOTA_LOG_FILE
+          value: "20971520"
+        - name: EV_TRAIN_MESSAGE_SAVE_PATH
+          value: /app/train/101196/result.json
+        - name: CVMART_AVAILABLE_SPACE
+          value: "10352877568"
+        - name: MINIO_URL
+          value: http://192.168.1.175:9000
+        - name: MINIO_TRAIN_RESULT_BUCKET
+          value: cvmart-train-result
+        - name: MINIO_COMMON_PREFIX
+          value: 705/1555/101196/9d6d8725daf5c65e2fd6aa9c5ca57d8b
+        - name: MINIO_X_AMZ_DATE
+          value: 20221214T091700Z
+        - name: MINIO_X_AMZ_SIGNATURE
+          value: d20fb4adbd38bef5e4289d8902dc917dbae695341163e3cc94f013f471c5a77b
+        - name: MINIO_X_AMZ_ALGORITHM
+          value: AWS4-HMAC-SHA256
+        - name: MINIO_X_AMZ_CREDENTIAL
+          value: admin/20221214/us-east-1/s3/aws4_request
+        - name: MINIO_POLICY
+          value: eyJleHBpcmF0aW9uIjoiMjAyMy0wMS0xM1QwOToxNzowMC43MTJaIiwiY29uZGl0aW9ucyI6W1siZXEiLCIkYnVja2V0IiwiY3ZtYXJ0LXRyYWluLXJlc3VsdCJdLFsic3RhcnRzLXdpdGgiLCIka2V5IiwiNzA1LzE1NTUvMTAxMTk2LzlkNmQ4NzI1ZGFmNWM2NWUyZmQ2YWE5YzVjYTU3ZDhiIl0sWyJlcSIsIiR4LWFtei1hbGdvcml0aG0iLCJBV1M0LUhNQUMtU0hBMjU2Il0sWyJlcSIsIiR4LWFtei1jcmVkZW50aWFsIiwiYWRtaW4vMjAyMjEyMTQvdXMtZWFzdC0xL3MzL2F3czRfcmVxdWVzdCJdLFsiZXEiLCIkeC1hbXotZGF0ZSIsIjIwMjIxMjE0VDA5MTcwMFoiXV19
+        - name: cvmart_logs_custom_config
+          value: cvmart.fields.trackNo=project-705-instance-1555-train-101196;cvmart.fields.limitSize=300000;cvmart.fields.minioObjName=/project-705-instance-1555-train-101196/project-705-instance-1555-train-101196.log
+        - name: cvmart_logs_studio
+          value: stdout
+        - name: cvmart_log_skip
+          value: "false"
+        image: 192.168.1.186:8099/evtrain/code-userid-144-project-705:v1.0.0
+        imagePullPolicy: Always
+        name: project-705-instance-1555-train-101196
+        resources:
+          limits:
+            cpu: "4"
+            github.com/fuse: "1"
+            memory: 8Gi
+            nvidia.com/gpu: "1"
+          requests:
+            cpu: "4"
+            memory: 8Gi
+            nvidia.com/gpu: "1"
+        terminationMessagePath: /dev/termination-log
+        terminationMessagePolicy: File
+        volumeMounts:
+        - mountPath: /app/
+          name: test-image-pvc
+        - mountPath: /clean/data/
+          name: clean-data
+        - mountPath: /train-callback/
+          name: train-callback
+        - mountPath: /home/data/
+          name: train-dataset
+        - mountPath: /project/config/
+          name: ice-config
+        - mountPath: /pre-train-model/
+          name: pre-train-model
+        - mountPath: /etc/localtime
+          name: localtime
+        - mountPath: /dev/shm
+          name: cache-volume
+        - mountPath: /tmp/models
+          name: model-backup
+        - mountPath: /project/train/tensorboard
+          name: tensorboard
+      dnsPolicy: ClusterFirst
+      imagePullSecrets:
+      - name: eagle-nest-registry-key
+      - name: selftrain-registry-key
+      initContainers:
+      - args:
+        - '(mkdir -p /train-dataset/10016/; [ -f /data/merge.sh ] && sh /data/merge.sh;
+          tar -xf /data/train.tar -C /train-dataset/10016/ && curl --retry 5 -s -d
+          "{''remark'':''mkdir -p /train-dataset/10016/; [ -f /data/merge.sh ] &&
+          sh /data/merge.sh; tar -xf /data/train.tar -C /train-dataset/10016/'',''is_success'':1,''cmd_type'':''init_containers_command'',''data'':[]}"
+          -H ''Content-Type: application/json'' http://192.168.1.131:8000/cvmart-trains/api/ft/xyz-train/callback/cmd/101196)
+          || (curl --retry 5 -s -d "{''remark'':''mkdir -p /train-dataset/10016/;
+          [ -f /data/merge.sh ] && sh /data/merge.sh; tar -xf /data/train.tar -C /train-dataset/10016/'',''is_success'':0,''cmd_type'':''init_containers_command'',''data'':[]}"
+          -H ''Content-Type: application/json'' http://192.168.1.131:8000/cvmart-trains/api/ft/xyz-train/callback/cmd/101196
+          && exit 1)'
+        command:
+        - sh
+        - -c
+        image: 192.168.1.186:8099/evtrain/testpedestrian-10016-train:v10
+        imagePullPolicy: IfNotPresent
+        name: project-705-instance-1555-train-101196-set-10016
+        env:
+        - name: cvmart_logs_custom_config
+          value: cvmart.fields.trackNo=project-705-instance-1555-train-101196;cvmart.fields.limitSize=300000;cvmart.fields.minioObjName=/project-705-instance-1555-train-101196/project-705-instance-1555-train-101196-set-10016.log
+        - name: cvmart_logs_stdout
+          value: stdout
+        - name: cvmart_log_skip
+          value: "false"
+        resources: {}
+        terminationMessagePath: /dev/termination-log
+        terminationMessagePolicy: File
+        volumeMounts:
+        - mountPath: /train-dataset/
+          name: train-dataset
+      nodeName: 192.168.1.186
+      restartPolicy: Never
+      schedulerName: default-scheduler
+      securityContext: {}
+      terminationGracePeriodSeconds: 30
+      volumes:
+      - name: test-image-pvc
+        persistentVolumeClaim:
+          claimName: test-image-pvc
+      - hostPath:
+          path: /data/clean-data/101196
+          type: ""
+        name: clean-data
+      - emptyDir: {}
+        name: train-dataset
+      - emptyDir: {}
+        name: pre-train-model
+      - emptyDir: {}
+        name: train-callback
+      - emptyDir:
+          medium: Memory
+        name: cache-volume
+      - hostPath:
+          path: /ice_config/
+          type: ""
+        name: ice-config
+      - hostPath:
+          path: /project/models/101196/
+          type: ""
+        name: model-backup
+      - hostPath:
+          path: /etc/localtime
+          type: ""
+        name: localtime
+      - hostPath:
+          path: /data/cvmart-tensorboard-log/705/144/101196/6b15c52e2bf151b30f23d45f22bfb547
+          type: ""
+        name: tensorboard

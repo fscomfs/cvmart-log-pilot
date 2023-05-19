@@ -1,26 +1,25 @@
 package utils
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
+	log "github.com/Sirupsen/logrus"
 	docker "github.com/docker/docker/client"
 	"github.com/docker/go-connections/sockets"
+	"github.com/fscomfs/cvmart-log-pilot/config"
 	"github.com/minio/minio-go/v7"
 	"github.com/minio/minio-go/v7/pkg/credentials"
 	"github.com/spf13/cast"
-	"log"
 	"math/rand"
 	"net"
 	"net/http"
 	"net/url"
-	"os"
 	"strings"
 )
 
 const (
-	ServerPort             = 5465
-	ProxyPort              = 5466
 	DefaultFileBeatHost    = "/run/filebeat_minio.sock"
 	FileBeatUpload         = "http://localhost/uploadFile"
 	API_LOG                = "/api/log"
@@ -39,14 +38,20 @@ type BaseResult struct {
 	Data   interface{} `json:"data"`
 }
 
-var MinioUrl = os.Getenv("MINIO_URL")
-var Bucket = os.Getenv("BUCKET")
-var MinioUsername = os.Getenv("MINIO_USERNAME")
-var MinioPassword = os.Getenv("MINIO_PASSWORD")
-var RemoteProxyUrl *url.URL
 var MinioClient *minio.Client
 var FileBeatClient *http.Client
 var ProxyHttpClient *http.Client
+var RemoteProxyUrl *url.URL
+
+func init() {
+	if config.GlobConfig.RemoteProxyHost != "" && config.GlobConfig.EnableProxy {
+		if proxyUrl, error := url.Parse(config.GlobConfig.RemoteProxyHost); error == nil {
+			RemoteProxyUrl = proxyUrl
+		} else {
+			log.Warnf("remoteProxyHost format error", error)
+		}
+	}
+}
 
 func SUCCESS_RES(msg string, data interface{}, w http.ResponseWriter) {
 	w.Header().Set("Content-Type", "application-json")
@@ -124,9 +129,9 @@ func InitFileBeatClient() {
 }
 
 func InitMinioClient() {
-	if MinioUsername != "" && MinioPassword != "" && MinioUrl != "" && Bucket != "" {
-		if client, err := minio.New(MinioUrl, &minio.Options{
-			Creds:  credentials.NewStaticV4(MinioUsername, MinioPassword, ""),
+	if config.GlobConfig.MinioAuth.UserName != "" && config.GlobConfig.MinioAuth.PassWord != "" && config.GlobConfig.MinioUrl != "" && config.GlobConfig.Bucket != "" {
+		if client, err := minio.New(config.GlobConfig.MinioUrl, &minio.Options{
+			Creds:  credentials.NewStaticV4(config.GlobConfig.MinioAuth.UserName, config.GlobConfig.MinioAuth.PassWord, ""),
 			Secure: false,
 		}); err != nil {
 			fmt.Printf("create minio client error:%+v", err)
@@ -139,26 +144,32 @@ func InitMinioClient() {
 func GetURLByHost(host string) string {
 	var hostUrl string
 	if strings.HasPrefix(host, "http") {
-		hostUrl = strings.TrimSuffix(host, "/") + ":" + cast.ToString(ServerPort)
+		hostUrl = strings.TrimSuffix(host, "/") + ":" + cast.ToString(config.GlobConfig.ServerPort)
 	} else {
-		hostUrl = "http://" + strings.TrimSuffix(host, "/") + ":" + cast.ToString(ServerPort)
+		hostUrl = "http://" + strings.TrimSuffix(host, "/") + ":" + cast.ToString(config.GlobConfig.ServerPort)
 	}
 	return hostUrl
 }
 
-var zz = "zbcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
-var lineSizeMax = 4 * 1024
+var zz = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
+var zzLen = 26 * 2
 
-func LineConfound(line string) string {
-	t := line
-	lens := len(line)
-	if lens > lineSizeMax {
-		s := lens / lineSizeMax
-		w := rand.Intn(len(zz) - 2)
-		for i := 0; i <= s; i++ {
-			r := rand.Intn(lens)
-			t = t[0:r] + zz[w:w+2] + t[r:]
+func LineConfound(line []byte, rsb bool) []byte {
+	if rsb {
+		rIndex := bytes.LastIndexByte(line, '\r')
+		if rIndex > 0 {
+			line = line[rIndex+1:]
 		}
 	}
-	return t
+	lens := len(line)
+	if lens > config.GlobConfig.LineMaxSize {
+		line = line[:config.GlobConfig.LineMaxSize]
+		lens = config.GlobConfig.LineMaxSize
+		for i := 0; i < lens/200; i++ {
+			s := rand.Intn(zzLen)
+			is := rand.Intn(lens)
+			line = append(line[:is+1], append([]byte{zz[s]}, line[is+1:]...)...)
+		}
+	}
+	return line
 }

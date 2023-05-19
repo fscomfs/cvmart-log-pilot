@@ -2,14 +2,12 @@ package pilot
 
 import (
 	"fmt"
-	"os"
+	"github.com/fscomfs/cvmart-log-pilot/config"
 	"strings"
 )
 
 // Global variables for piloter
 const (
-	ENV_PILOT_TYPE = "PILOT_TYPE"
-
 	PILOT_FILEBEAT = "filebeat"
 	PILOT_FLUENTD  = "fluentd"
 )
@@ -31,10 +29,10 @@ type Piloter interface {
 
 // NewPiloter instantiates a new piloter
 func NewPiloter(baseDir string) (Piloter, error) {
-	if os.Getenv(ENV_PILOT_TYPE) == PILOT_FILEBEAT {
+	if config.GlobConfig.PilotType == PILOT_FILEBEAT {
 		return NewFilebeatPiloter(baseDir)
 	}
-	if os.Getenv(ENV_PILOT_TYPE) == PILOT_FLUENTD {
+	if config.GlobConfig.PilotType == PILOT_FLUENTD {
 		return NewFluentdPiloter()
 	}
 	return nil, fmt.Errorf("InvalidPilotType")
@@ -42,7 +40,7 @@ func NewPiloter(baseDir string) (Piloter, error) {
 
 // CustomConfig custom config
 func CustomConfig(name string, customConfigs map[string]string, logConfig *LogConfig) {
-	if os.Getenv(ENV_PILOT_TYPE) == PILOT_FILEBEAT {
+	if config.GlobConfig.PilotType == PILOT_FILEBEAT {
 		fields := make(map[string]string)
 		configs := make(map[string]string)
 		for k, v := range customConfigs {

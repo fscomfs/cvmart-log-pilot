@@ -5,6 +5,7 @@ import os
 import os.path
 import subprocess
 import argparse
+import json
 
 base = '/host'
 pilot_fluentd = "fluentd"
@@ -48,8 +49,15 @@ def run():
 def config():
     pilot_type = os.environ.get(ENV_PILOT_TYPE)
     if pilot_filebeat == pilot_type:
+        with open("/etc/cvmart/daemon-config.json","r") as file:
+             data=file.read()
+        json_data=json.loads(data)
+        os.environ["MINIO_URL"]=json_data["minio_url"]
+        os.environ["BUCKET"]=json_data["bucket"]
+        os.environ["MINIO_USERNAME"]=json_data["minio_auth"]["user_name"]
+        os.environ["MINIO_PASSWORD"]=json_data["minio_auth"]["pass_word"]
         print("start log-pilot:", pilot_filebeat)
-        subprocess.check_call(['/pilot/config.filebeat'])
+        subprocess.check_call(['/pilot/config.filebeat'],env=os.environ)
     else:
         print("start log-pilot:", pilot_fluentd)
         subprocess.check_call(['/pilot/config.fluentd'])

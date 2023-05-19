@@ -19,18 +19,17 @@ func TestTailLog(t *testing.T) {
 	if err != nil {
 
 	}
-	logClaims := &LogClaims{
+	logParam := LogParam{
 		ContainerId: "4d07f21edd9c",
 		Host:        "localhost",
-		Port:        "2375",
 		Operator:    "log",
 		Tail:        "50000",
 	}
-	GeneratorToken(logClaims)
+	GeneratorToken(logParam, 100)
 	c := &ConnectDef{
-		Connect:   nil,
-		LogClaims: logClaims,
-		WriteMsg:  make(chan []byte),
+		Connect:  nil,
+		LogParam: &logParam,
+		WriteMsg: make(chan []byte),
 	}
 	go func() {
 		for {
@@ -57,7 +56,7 @@ func TestLog(t *testing.T) {
 	initK8sClient()
 	c := &ConnectDef{
 		Id: "111",
-		LogClaims: &LogClaims{
+		LogParam: &LogParam{
 			PodLabel: "log-test",
 		},
 		WriteMsg: make(chan []byte),

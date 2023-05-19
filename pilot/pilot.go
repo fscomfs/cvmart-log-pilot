@@ -20,6 +20,7 @@ import (
 	"github.com/docker/docker/api/types/filters"
 	"github.com/docker/docker/api/types/mount"
 	k8s "github.com/docker/docker/client"
+	"github.com/fscomfs/cvmart-log-pilot/config"
 	"golang.org/x/net/context"
 )
 
@@ -30,22 +31,20 @@ aliyun.log: /var/log/hello.log[:json][;/var/log/abc/def.log[:txt]]
 
 // Global variables
 const (
-	ENV_PILOT_LOG_PREFIX     = "PILOT_LOG_PREFIX"
 	ENV_PILOT_CREATE_SYMLINK = "PILOT_CREATE_SYMLINK"
 	ENV_LOGGING_OUTPUT       = "LOGGING_OUTPUT"
 
-	ENV_SERVICE_LOGS_TEMPL                  = "%s_logs_"
-	ENV_SERVICE_LOGS_CUSTOME_CONFIG_TEMPL   = "%s_logs_custom_config"
-	LABEL_SERVICE_LOGS_TEMPL                = "%s.logs."
-	LABEL_SERVICE_LOGS_CUSTOME_CONFIG_TEMPL = "%s.logs.custom.config"
-	LABEL_PROJECT_SWARM_MODE                = "com.docker.stack.namespace"
-	LABEL_PROJECT                           = "com.docker.compose.project"
-	LABEL_SERVICE                           = "com.docker.compose.service"
-	LABEL_SERVICE_SWARM_MODE                = "com.docker.swarm.service.name"
-	LABEL_K8S_POD_NAMESPACE                 = "io.kubernetes.pod.namespace"
-	LABEL_K8S_CONTAINER_NAME                = "io.kubernetes.container.name"
-	LABEL_POD                               = "io.kubernetes.pod.name"
-	SYMLINK_LOGS_BASE                       = "/acs/log/"
+	ENV_SERVICE_LOGS_TEMPL                = "%s_logs_"
+	ENV_SERVICE_LOGS_CUSTOME_CONFIG_TEMPL = "%s_logs_custom_config"
+	LABEL_SERVICE_LOGS_TEMPL              = "%s.logs."
+	LABEL_PROJECT_SWARM_MODE              = "com.docker.stack.namespace"
+	LABEL_PROJECT                         = "com.docker.compose.project"
+	LABEL_SERVICE                         = "com.docker.compose.service"
+	LABEL_SERVICE_SWARM_MODE              = "com.docker.swarm.service.name"
+	LABEL_K8S_POD_NAMESPACE               = "io.kubernetes.pod.namespace"
+	LABEL_K8S_CONTAINER_NAME              = "io.kubernetes.container.name"
+	LABEL_POD                             = "io.kubernetes.pod.name"
+	SYMLINK_LOGS_BASE                     = "/acs/log/"
 
 	ERR_ALREADY_STARTED = "already started"
 )
@@ -94,12 +93,10 @@ func New(tplStr string, baseDir string) (*Pilot, error) {
 		return nil, err
 	}
 
-	logPrefix := []string{"aliyun"}
-	if os.Getenv(ENV_PILOT_LOG_PREFIX) != "" {
-		envLogPrefix := os.Getenv(ENV_PILOT_LOG_PREFIX)
-		logPrefix = strings.Split(envLogPrefix, ",")
+	logPrefix := []string{"cv"}
+	if config.GlobConfig.PilotLogPrefix != "" {
+		logPrefix = strings.Split(config.GlobConfig.PilotLogPrefix, ",")
 	}
-
 	createSymlink := os.Getenv(ENV_PILOT_CREATE_SYMLINK) == "true"
 	return &Pilot{
 		client:        client,
@@ -368,7 +365,6 @@ func (p *Pilot) newContainer(containerJSON *types.ContainerJSON) error {
 			if !strings.HasPrefix(e, serviceLogs) {
 				continue
 			}
-
 			envLabel := strings.SplitN(e, "=", 2)
 			if len(envLabel) == 2 {
 				labelKey := strings.Replace(envLabel[0], "_", ".", -1)
@@ -376,7 +372,6 @@ func (p *Pilot) newContainer(containerJSON *types.ContainerJSON) error {
 			}
 		}
 	}
-
 	logConfigs, err := p.getLogConfigs(jsonLogPath, mounts, labels)
 	if err != nil {
 		return err

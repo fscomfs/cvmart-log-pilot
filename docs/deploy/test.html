@@ -1,0 +1,113 @@
+<!doctype html>
+  <html>
+    <head>
+      <link rel="stylesheet" href="dist/xterm.css" />
+      <script src="dist/xterm.js"></script>
+    </head>
+    <body>
+      <div id="terminal"></div>
+      <div id="resource">
+          <a>内存:</a>
+          <span>--/--</span>
+          <a>CPU使用率:</a>
+          <span>----(%)</span>
+          <a>GPU显存:</a>
+          <span>--/--</span>
+          <a>GPU-util:</a>
+          <span>--(%)</span>
+      </div>
+      <script>
+      rows =  50;
+      cols = 150;
+      let config = {
+        // rendererType: "canvas", //渲染类型
+        convertEol: true, //启用时，光标将设置为下一行的开头
+        scrollback: 1000, //终端中的回滚量
+        disableStdin: false, //是否应禁用输入。
+        cursorStyle: "underline", //光标样式
+        cursorBlink: true, //光标闪烁
+        cols: cols,
+        rows: rows,
+        theme: {
+            // foreground: "#14e264", //字体
+            background: "#002833", //背景色
+            cursor: "help", //设置光标
+            lineHeight: 16
+        },
+        bellStyle:'sound',
+        rightClickSelectsWord:true,
+        screenReaderMode:false,
+        allowProposedApi: false,
+        LogLevel: 'debug',
+        tabStopWidth: 4
+      }
+       var token = "DMKDTnpfvIGKg6HW1r3YkGTiUYplNDvkNzl9f/PrRnDNtzei5Xdx1LnIXqBZPynV4lPgacvqDpuyiLZfK1MYCYr4e9B+GIYfJcFQFpoNQZ8o7VA2/5qePGpQgG0nQ+V1vyfiHXnX2DDwbf1O/tE21hIfsPkgHYYzyTWBoczptrtL9qUmVtGxIBNBoGy3/YuTGqWACusBMvf3SH59+ih9F/GNBYZ9WXQq9LX0bMSIVMo="
+   // var token = "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJwb3J0IjoiMjM3NSIsInBvZExhYmVsIjoiIiwiaG9zdCI6ImxvY2FsaG9zdCIsImNvbnRhaW5lcklkIjoiODVlMWNiYjM1ZmUxIiwiZXhwIjoxNjcyNzgxNDE3LCJvcGVyYXRvciI6ImxvZyIsIm1pbmlvT2JqTmFtZSI6IiJ9.L8_wMaKLKMES5EN2zaNYc83KuNcgYwRhJi405n69SCU"
+        var term = new Terminal(config);
+        function  connectSocket(){
+            var ws = new WebSocket('ws://127.0.0.1:5645/api/log?token='+encodeURIComponent(token));
+            term.open(document.getElementById('terminal'));
+            setTimeout(()=>{
+
+            },10000)
+            ws.onopen = function (){
+
+            }
+            ws.onclose=function (){
+                setTimeout(()=>{
+                    connectSocket()
+                },10000)
+            }
+
+            ws.onmessage = function (data) {
+                // term.write(data)
+                if(data.data instanceof Blob){
+                    //完成通信后关闭WebSocket连接
+                    data.data.slice(0,4).text().then((res)=>{
+                        if(res=="1000"){
+                            binaryToStr(data.data.slice(4,data.data.size),(res)=>{
+                                term.write(res)
+                            })
+                        }
+                        if(res=="1100"){
+                            binaryToStr(data.data.slice(4,data.data.size),(res)=>{
+                                console.log(res)
+                                res=JSON.parse(res)
+                                resourceBox=document.getElementById("resource")
+                                var spans=resourceBox.querySelectorAll("span");
+                                mem = new Number(res.Memory/1024/1024/1024)
+                                memLimit = new Number(res.MemoryLimit/1024/1024/1024)
+                                spans[0].innerText=""+mem.toFixed(2)+"Gb/"+ memLimit.toFixed(2)+"Gb"
+                                spans[1].innerText=new Number(res.CPUPercentage).toFixed(2)+"%"
+                            })
+                        }
+                        if(res=="1110"){
+                            binaryToStr(data.data.slice(4,data.data.size),(res)=>{
+                                console.log(res)
+                                res=JSON.parse(res)
+                                resourceBox=document.getElementById("resource")
+                                var spans=resourceBox.querySelectorAll("span");
+                                for(var g in res){
+                                    used = new Number(res[g].used/1024/1024/1000)
+                                    total = new Number(res[g].total/1024/1024/1000)
+                                    spans[2].innerText=""+used.toFixed(2)+"Gb/"+ total.toFixed(2)+"Gb"
+                                    spans[3].innerText=new Number(res[g].gpuUtil).toFixed(2)+"%"
+                                }
+                            })
+                        }
+                    })
+
+                }
+            }
+       }
+      connectSocket()
+        function binaryToStr(str,callback){
+          var reader = new FileReader();
+          reader.readAsText(str, 'utf-8');
+          reader.onload = function(e){
+              callback(reader.result)
+          }
+        }
+      </script>
+    </body>
+  </html>

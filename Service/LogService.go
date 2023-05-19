@@ -3,13 +3,13 @@ package Service
 import (
 	"bufio"
 	"encoding/base64"
-	"encoding/json"
 	"fmt"
+	"github.com/fscomfs/cvmart-log-pilot/config"
 	"github.com/fscomfs/cvmart-log-pilot/container_log"
 	"github.com/fscomfs/cvmart-log-pilot/utils"
+	"github.com/google/uuid"
 	"github.com/gorilla/websocket"
 	"github.com/minio/minio-go/v7"
-	"github.com/spf13/cast"
 	"io"
 	"io/ioutil"
 	"log"
@@ -23,8 +23,8 @@ type ConnectHub struct {
 }
 
 type ConnectDef struct {
-	Id         string                   `json:"id"`
-	LogClaims  *container_log.LogClaims `json:"LogClaims"`
+	Id         string                  `json:"id"`
+	LogParam   *container_log.LogParam `json:"log_param"`
 	WriteMsg   chan []byte
 	CloseConn  chan bool
 	Connect    *websocket.Conn
@@ -35,29 +35,31 @@ var connectHub = ConnectHub{
 	connects: make(map[string]*ConnectDef),
 }
 
+var auth = container_log.AESAuth{}
+
 func destroy(id string) {
 	connectHub.connects[id].Connect.Close()
 	delete(connectHub.connects, id)
 }
 
 func LogHandler(w http.ResponseWriter, r *http.Request) {
-	values := r.URL.Query()
-	token := values.Get("token")
-	id := values.Get("id")
+	uuid, _ := uuid.NewUUID()
+	id := uuid.String()
+	token := r.URL.Query().Get("token")
 	conn, err := upgrader.Upgrade(w, r, nil)
 	if err != nil {
 		log.Printf("RequestHandler upgrader %+v", err)
 		return
 	}
 	//login auth
-	logClaims, err := container_log.Auth(token)
+	logParam, err := auth.Auth(token)
 	if err != nil {
-		conn.WriteMessage(websocket.TextMessage, []byte("bad auth"))
-		conn.WriteMessage(websocket.CloseMessage, []byte(""))
+		conn.WriteMessage(websocket.TextMessage, []byte(err.Error()))
+		conn.WriteMessage(websocket.CloseMessage, []byte("connect close"))
 		conn.Close()
 		return
 	}
-	container_log.RegistryConnect(id, logClaims, conn)
+	container_log.RegistryConnect(id, logParam, conn)
 
 }
 
@@ -83,11 +85,10 @@ func DownloadLogHandler(w http.ResponseWriter, r *http.Request) {
 		} else {
 			w.Header().Set("content-Disposition", fmt.Sprintf("attachment;filename=%s", "cvmart-log.log"))
 		}
-		object, err := utils.MinioClient.GetObject(r.Context(), utils.Bucket, objName, minio.GetObjectOptions{})
+		object, err := utils.MinioClient.GetObject(r.Context(), config.GlobConfig.Bucket, objName, minio.GetObjectOptions{})
 		if err == nil {
 			r := bufio.NewReader(object)
 			defer object.Close()
-			var j interface{}
 			for {
 				line, e := r.ReadBytes('\n')
 				if e != nil {
@@ -96,14 +97,7 @@ func DownloadLogHandler(w http.ResponseWriter, r *http.Request) {
 					}
 					return
 				}
-				e = json.Unmarshal(line, &j)
-				if e != nil {
-					w.Write([]byte(e.Error() + "\n"))
-				}
-				data := j.(map[string]interface{})
-				if log, ok := data["log"]; ok {
-					w.Write([]byte(utils.LineConfound(cast.ToString(log))))
-				}
+				w.Write(utils.LineConfound(line, true))
 			}
 		}
 	}

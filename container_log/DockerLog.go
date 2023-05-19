@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"github.com/docker/docker/api/types"
 	docker "github.com/docker/docker/client"
+	"github.com/fscomfs/cvmart-log-pilot/config"
 	"github.com/fscomfs/cvmart-log-pilot/utils"
 	"github.com/gorilla/websocket"
 	"io"
@@ -16,10 +17,8 @@ import (
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 	"log"
-	"net"
 	"net/http"
 	"net/url"
-	"os"
 	"strings"
 	"time"
 )
@@ -56,19 +55,18 @@ func init() {
 	initK8sClient()
 }
 func initK8sClient() {
-	config, err := rest.InClusterConfig()
+	c, err := rest.InClusterConfig()
 	if err != nil {
-		host, port, token := os.Getenv("KUBERNETES_SERVICE_HOST"), os.Getenv("KUBERNETES_SERVICE_PORT"), os.Getenv("KUBERNETES_TOKEN")
-		config = &rest.Config{
-			Host:        "https://" + net.JoinHostPort(host, port),
-			BearerToken: token,
+		c = &rest.Config{
+			Host:        config.GlobConfig.KubeApiUrl,
+			BearerToken: config.GlobConfig.KubeAuth.Token,
 			TLSClientConfig: rest.TLSClientConfig{
 				Insecure: true,
 			},
 		}
 	}
 	// create the clientset
-	clientset, err := kubernetes.NewForConfig(config)
+	clientset, err := kubernetes.NewForConfig(c)
 	if err != nil {
 		panic(err.Error())
 	}
@@ -113,10 +111,17 @@ func GetPodProcess(status k8sApi.PodStatus) int {
 	return process
 }
 
+func isContainer(def *ConnectDef) bool {
+	if def.LogParam.ContainerId != "" && def.LogParam.PodLabel == "" {
+		return true
+	}
+	return false
+}
+
 func (d *DockerLog) Start(ctx context.Context, def *ConnectDef) error {
 	var containerId string
 	var dockerHost string
-	if def.LogClaims.ContainerId == "" && def.LogClaims.PodLabel != "" && d.k8sClient != nil {
+	if !isContainer(def) {
 		for {
 			if d.closed {
 				log.Printf("DockerLog closed id=%+v", def.Id)
@@ -124,7 +129,7 @@ func (d *DockerLog) Start(ctx context.Context, def *ConnectDef) error {
 			}
 			podList, err := k8sClient.CoreV1().Pods("default").List(context.Background(), v1.ListOptions{
 				Watch:         false,
-				LabelSelector: "app=" + def.LogClaims.PodLabel,
+				LabelSelector: "app=" + def.LogParam.PodLabel,
 			})
 
 			if err != nil || len(podList.Items) == 0 {
@@ -163,21 +168,21 @@ func (d *DockerLog) Start(ctx context.Context, def *ConnectDef) error {
 			time.Sleep(5 * time.Second)
 		}
 	} else {
-		containerId = def.LogClaims.ContainerId
-		dockerHost = def.LogClaims.Host + ":" + def.LogClaims.Port
+		containerId = def.LogParam.ContainerId
+		dockerHost = def.LogParam.Host + ":" + fmt.Sprint(config.GlobConfig.DockerServerPort)
 	}
-	log.Printf("start tail container log:%+v", def.LogClaims)
+	log.Printf("start tail container log:%+v", def.LogParam)
 	if d.client == nil {
 		d.dockerHost = dockerHost
 		d.client = GetDockerClient(d.dockerHost)
 	}
 	tail := "10000"
-	if def.LogClaims.Tail != "" {
-		tail = def.LogClaims.Tail
+	if def.LogParam.Tail != "" {
+		tail = def.LogParam.Tail
 	}
 	go func() {
 		for {
-			h, _ := containerGpuInfo(ctx, strings.Split(dockerHost, ":")[0]+fmt.Sprintf(":%d", utils.ServerPort), containerId, func(res []byte) {
+			h, _ := containerGpuInfo(ctx, strings.Split(dockerHost, ":")[0]+fmt.Sprintf(":%d", config.GlobConfig.ServerPort), containerId, func(res []byte) {
 				def.write(gpuMessage(res))
 			})
 			if !h {

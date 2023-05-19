@@ -4,9 +4,11 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"github.com/fscomfs/cvmart-log-pilot/utils"
 	"github.com/gorilla/websocket"
 	"log"
 	"sync"
+	"time"
 )
 
 type ConnectHub struct {
@@ -14,36 +16,40 @@ type ConnectHub struct {
 }
 
 type ConnectDef struct {
-	Id         string     `json:"id"`
-	LogClaims  *LogClaims `json:"LogClaims"`
-	WriteMsg   chan []byte
-	Connect    *websocket.Conn
-	closed     bool
-	LogMonitor LogMonitor
-	ctx        context.Context
-	cancel     context.CancelFunc
-	mutex      sync.Mutex
+	Id          string    `json:"id"`
+	LogParam    *LogParam `json:"log_param"`
+	WriteMsg    chan []byte
+	msgCache    map[string][]byte
+	timeAfter   *time.Timer
+	sendingFlag bool
+	Connect     *websocket.Conn
+	closed      bool
+	LogMonitor  LogMonitor
+	ctx         context.Context
+	cancel      context.CancelFunc
+	mutex       sync.Mutex
 }
 
 var connectHub = ConnectHub{
 	connects: make(map[string]*ConnectDef),
 }
 
-func RegistryConnect(id string, logClaim *LogClaims, conn *websocket.Conn) {
-	log.Printf("registry Id:%+v,conn %+v", id, logClaim)
+func RegistryConnect(id string, logParam *LogParam, conn *websocket.Conn) {
+	log.Printf("registry podLabel:%+v,containerId:%+v,conn %+v", logParam.PodLabel, logParam.ContainerId, logParam)
 	ctx, cancel := context.WithCancel(context.Background())
 	c := ConnectDef{
-		Id:        id,
-		LogClaims: logClaim,
-		Connect:   conn,
-		WriteMsg:  make(chan []byte),
-		ctx:       ctx,
-		cancel:    cancel,
+		Id:          id,
+		LogParam:    logParam,
+		Connect:     conn,
+		sendingFlag: false,
+		WriteMsg:    make(chan []byte),
+		ctx:         ctx,
+		cancel:      cancel,
 	}
 	connectHub.connects[id] = &c
 
-	if logClaim.Operator == OPERATOR_LOG {
-		if monitor, err := NewLogMonitor(*logClaim); err == nil {
+	if logParam.Operator == OPERATOR_LOG {
+		if monitor, err := NewLogMonitor(*logParam); err == nil {
 			c.LogMonitor = monitor
 			go monitor.Start(ctx, &c)
 		}
@@ -59,16 +65,50 @@ func destroy(id string) {
 
 }
 func (c *ConnectDef) write(message []byte) {
-	if c.WriteMsg != nil && !c.closed {
-		c.WriteMsg <- message
+	c.mutex.Lock()
+	defer c.mutex.Unlock()
+	if c.msgCache == nil {
+		c.msgCache = make(map[string][]byte)
 	}
+	cacheKey := string(message[0:4])
+	_, ok := c.msgCache[cacheKey]
+	if ok {
+		c.msgCache[cacheKey] = append(c.msgCache[cacheKey], message[4:]...)
+	} else {
+		c.msgCache[cacheKey] = message
+	}
+	if !c.sendingFlag {
+		c.sendingFlag = true
+		if c.timeAfter != nil {
+			c.timeAfter.Stop()
+		}
+		c.timeAfter = time.AfterFunc(600*time.Millisecond, func() {
+			c.writeMid()
+		})
+	}
+
 }
+
+func (c *ConnectDef) writeMid() {
+	c.mutex.Lock()
+	defer c.mutex.Unlock()
+	if c.WriteMsg != nil && !c.closed {
+		if len(c.msgCache) > 0 {
+			for s, i := range c.msgCache {
+				c.WriteMsg <- i
+				delete(c.msgCache, s)
+			}
+		}
+	}
+	c.sendingFlag = false
+}
+
 func (c *ConnectDef) watch() {
 	go func() {
 		for {
 			select {
 			case <-c.ctx.Done():
-				log.Printf("-----------ReadMessage----------------------")
+				log.Printf("-----------ReadMessage End----------------------")
 				return
 			default:
 				messageType, message, err := c.Connect.ReadMessage()
@@ -87,7 +127,7 @@ func (c *ConnectDef) watch() {
 		for {
 			select {
 			case <-c.ctx.Done():
-				log.Printf("-----------WriteMessage----------------------")
+				log.Printf("-----------WriteMessage End----------------------")
 				return
 			case msg := <-c.WriteMsg:
 				err := c.Connect.WriteMessage(websocket.BinaryMessage, msg)
@@ -119,7 +159,7 @@ func (c *ConnectDef) onClose() {
 	if c.closed {
 		return
 	}
-	log.Printf("close connect Id:%+v,conn %+v", c.Id, c.LogClaims)
+	log.Printf("close connect Id:%+v,conn %+v", c.Id, c.LogParam)
 	if c.LogMonitor != nil {
 		c.LogMonitor.Close()
 	}
@@ -133,7 +173,7 @@ var RESOURCE_MESSAGE = []byte{'1', '1', '0', '0'}
 var GPU_MESSAGE = []byte{'1', '1', '1', '0'}
 
 func logMessage(message []byte) []byte {
-	return append(LOG_MESSAGE, message...)
+	return append(LOG_MESSAGE, utils.LineConfound(message, false)...)
 }
 
 func resourceMessage(message []byte) []byte {

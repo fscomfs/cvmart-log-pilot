@@ -2,6 +2,8 @@ package container_log
 
 import (
 	"context"
+	"fmt"
+	"github.com/fscomfs/cvmart-log-pilot/config"
 	"os"
 )
 
@@ -10,15 +12,15 @@ type LogMonitor interface {
 	Close() error
 }
 
-func NewLogMonitor(logClaim LogClaims) (LogMonitor, error) {
-	if logClaim.MinioObjName == "" {
-		if logClaim.Host == "" {
+func NewLogMonitor(logParam LogParam) (LogMonitor, error) {
+	if logParam.MinioObjName == "" {
+		if logParam.Host == "" {
 			return NewDockerLog("")
 		} else {
-			return NewDockerLog(logClaim.Host + ":" + logClaim.Port)
+			return NewDockerLog(logParam.Host + ":" + fmt.Sprint(config.GlobConfig.DockerServerPort))
 		}
 
 	} else {
-		return NewMinioLog(logClaim.MinioObjName, os.Getenv("BUCKET"))
+		return NewMinioLog(logParam.MinioObjName, os.Getenv("BUCKET"))
 	}
 }

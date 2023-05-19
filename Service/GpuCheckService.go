@@ -2,7 +2,7 @@ package Service
 
 import (
 	"encoding/json"
-	"github.com/fscomfs/cvmart-log-pilot/gpu"
+	"github.com/fscomfs/cvmart-log-pilot/gpu/nvidia"
 	"github.com/fscomfs/cvmart-log-pilot/utils"
 	"net/http"
 )
@@ -10,7 +10,7 @@ import (
 func CheckGpuHandler(w http.ResponseWriter, r *http.Request) {
 	values := r.URL.Query()
 	appNum := values.Get("appNum")
-	status, error := gpu.CheckGpu(appNum)
+	status, error := nvidia.CheckGpu(appNum)
 	msg := ""
 	if error != nil {
 		msg = error.Error()

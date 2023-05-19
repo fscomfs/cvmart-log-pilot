@@ -3,6 +3,9 @@ package Service
 import (
 	"encoding/json"
 	"github.com/fscomfs/cvmart-log-pilot/gpu"
+	_ "github.com/fscomfs/cvmart-log-pilot/gpu/atlas"
+	_ "github.com/fscomfs/cvmart-log-pilot/gpu/nvidia"
+	_ "github.com/fscomfs/cvmart-log-pilot/gpu/sophgo"
 	"github.com/gorilla/websocket"
 	"log"
 	"net/http"

@@ -1,12 +1,12 @@
 {{range .configList}}
-- type: filestream
+- type: container
   enabled: true
   paths:
       - {{ .HostDir }}/{{ .File }}
   scan_frequency: 5s
   fields_under_root: true
   {{if .Stdout}}
-  docker-json: false
+  docker-json: true
   {{end}}
   {{if eq .Format "json"}}
   json.keys_under_root: true

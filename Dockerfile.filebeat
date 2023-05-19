@@ -1,11 +1,11 @@
-from nvidia/cuda:11.3.0-runtime-ubuntu20.04
+from ubuntu:20.04
 ARG TARGETARCH
 
 RUN apt-get update &&\
     apt-get install -y python3 &&\
     apt-get install -y vim
 
-COPY build/bin/cvmart-log-pilot-linux-${TARGETARCH} /pilot/pilot
+COPY build/bin/cvmart-daemon-linux-${TARGETARCH} /pilot/pilot
 COPY filebeat-binary/filebeat_linux_${TARGETARCH} /usr/bin/filebeat
 COPY assets/gpu_check/nvidia_gpu_check_amd64 /usr/bin/nvidia_gpu_check
 COPY assets/entrypoint assets/filebeat/ assets/healthz /pilot/
@@ -16,5 +16,5 @@ HEALTHCHECK CMD /pilot/healthz
 
 WORKDIR /pilot/
 ENV PILOT_TYPE=filebeat
-ENV LD_LIBRARY_PATH=/host/usr/local/lib:/usr/local/Ascend/driver/lib64:/host/usr/local/Ascend/driver/lib64:/usr/local/dcmi:/host/usr/lib/:$LD_LIBRARY_PATH
+ENV LD_LIBRARY_PATH=/host/usr/local/lib:/usr/local/Ascend/driver/lib64:/host/usr/local/Ascend/driver/lib64:/usr/local/dcmi:/host/usr/lib/:/usr/lib64:/usr/local/neuware/lib64:/host/usr/local/neuware/lib64:$LD_LIBRARY_PATH
 ENTRYPOINT ["python3","/pilot/entrypoint"]

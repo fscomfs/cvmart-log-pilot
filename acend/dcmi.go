@@ -1,5 +1,0 @@
-package acend
-
-func Init() {
-
-}

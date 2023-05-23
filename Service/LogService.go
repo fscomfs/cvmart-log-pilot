@@ -85,7 +85,7 @@ func DownloadLogHandler(w http.ResponseWriter, r *http.Request) {
 		} else {
 			w.Header().Set("content-Disposition", fmt.Sprintf("attachment;filename=%s", "cvmart-log.log"))
 		}
-		object, err := utils.MinioClient.GetObject(r.Context(), config.GlobConfig.Bucket, objName, minio.GetObjectOptions{})
+		object, err := utils.GetMinioClient().GetObject(r.Context(), config.GlobConfig.Bucket, objName, minio.GetObjectOptions{})
 		if err == nil {
 			r := bufio.NewReader(object)
 			defer object.Close()
@@ -109,7 +109,7 @@ func UploadLogByTrackNo(w http.ResponseWriter, r *http.Request) {
 	host := values.Get("host")
 	if host == "" {
 		//localhost
-		if resp, err := utils.FileBeatClient.Get(utils.FileBeatUpload + "?trackNo=" + trackNo); err == nil {
+		if resp, err := utils.GetFileBeatClient().Get(utils.FileBeatUpload + "?trackNo=" + trackNo); err == nil {
 			content, _ := ioutil.ReadAll(resp.Body)
 			re := string(content)
 			if re == "1" { //success
@@ -124,7 +124,7 @@ func UploadLogByTrackNo(w http.ResponseWriter, r *http.Request) {
 			w.WriteHeader(http.StatusBadRequest)
 		}
 	} else {
-		resp, err := utils.ProxyHttpClient.Get(utils.GetURLByHost(host) + utils.API_UPLOADLOGBYTRACKNO + "?trackNo=" + trackNo)
+		resp, err := utils.GetHttpClient(host).Get(utils.GetURLByHost(host) + utils.API_UPLOADLOGBYTRACKNO + "?trackNo=" + trackNo)
 		if err != nil {
 			w.WriteHeader(http.StatusBadRequest)
 			log.Printf("request uploadLogByTrackNo proxy error %+v", err)

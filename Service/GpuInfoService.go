@@ -27,9 +27,9 @@ func ContainerGpuInfoHandler(w http.ResponseWriter, r *http.Request) {
 	var index []string
 	if gpuInfoExecutor != nil {
 		index = gpuInfoExecutor.ContainerDevices(containerID)
+		log.Printf("get device executor %+v", len(index))
 	}
 	if len(index) > 0 {
-		log.Printf("device:%+v", index)
 		conn, _ := upgrader.Upgrade(w, r, nil)
 		defer conn.Close()
 		for {
@@ -39,6 +39,7 @@ func ContainerGpuInfoHandler(w http.ResponseWriter, r *http.Request) {
 				jsonStr, _ := json.Marshal(res)
 				err := conn.WriteMessage(websocket.TextMessage, jsonStr)
 				if err != nil {
+					log.Printf("-----------gpu info end----------------------")
 					return
 				}
 			}

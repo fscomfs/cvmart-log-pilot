@@ -22,6 +22,7 @@ func init() {
 	r := nvml.Init()
 	if r == nvml.SUCCESS {
 		gpu.SetExecutor(&NvidiaInfo{})
+		log.Printf("nvml init success")
 	} else {
 		log.Printf("nvml init fail")
 	}

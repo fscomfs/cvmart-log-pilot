@@ -3,8 +3,10 @@ package container_log
 import (
 	"context"
 	"fmt"
+	"github.com/fscomfs/cvmart-log-pilot/utils"
 	"log"
 	"os"
+	"regexp"
 	"testing"
 	"time"
 )
@@ -53,7 +55,7 @@ func TestLog(t *testing.T) {
 	if err != nil {
 
 	}
-	initK8sClient()
+	utils.InitK8sClient()
 	c := &ConnectDef{
 		Id: "111",
 		LogParam: &LogParam{
@@ -76,10 +78,8 @@ func TestLog(t *testing.T) {
 }
 
 func TestR(t *testing.T) {
-	s := "12345678"
-	w := s[:2] + "ss" + s[2:]
-	fmt.Printf(w)
-
+	reg, _ := regexp.Compile(`172\.16\..`)
+	fmt.Printf("d:%+v", reg.MatchString("172.16.1115"))
 }
 
 func TestGoContext(t *testing.T) {

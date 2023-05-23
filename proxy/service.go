@@ -2,21 +2,23 @@ package services
 
 import (
 	"fmt"
-	"github.com/fscomfs/cvmart-log-pilot/utils"
+	"github.com/fscomfs/cvmart-log-pilot/config"
 	"github.com/spf13/cast"
 	"log"
 	"runtime/debug"
 )
 
-func init() {
+func InitProxy() {
 	httpArgs := HTTPArgs{}
 	timeOut := 5000
-	local := "0.0.0.0:" + cast.ToString(utils.ProxyPort)
+	local := "0.0.0.0:" + cast.ToString(config.GlobConfig.ProxyPort)
 	parent := ""
 	auth := []string{}
 	localType := "tcp"
+	Always := true
 	httpArgs.HTTPTimeout = &timeOut
 	httpArgs.Timeout = &timeOut
+	httpArgs.Always = &Always
 	httpArgs.Args.Local = &local
 	httpArgs.Args.Parent = &parent
 	httpArgs.AuthFile = &parent

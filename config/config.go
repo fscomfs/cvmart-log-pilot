@@ -18,12 +18,15 @@ type Config struct {
 	KubeAuth         AuthConfig `json:"kube_auth"`
 	RemoteProxyHost  string     `json:"remote_proxy_host"`
 	EnableProxy      bool       `json:"enable_proxy"`
+	ProxyGlobal      bool       `json:"proxy_global"`
+	ProxyHostPattern string     `json:"proxy_host_pattern"`
 	MinioUrl         string     `json:"minio_url"`
 	Bucket           string     `json:"bucket"`
 	MinioAuth        AuthConfig `json:"minio_auth"`
 	PilotType        string     `json:"pilot_type"`
 	PilotLogPrefix   string     `json:"pilot_log_prefix"`
 	LineMaxSize      int        `json:"line_max_size"`
+	ProxyPort        int        `json:"proxy_port"`
 }
 
 type AuthConfig struct {

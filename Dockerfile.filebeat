@@ -16,5 +16,5 @@ HEALTHCHECK CMD /pilot/healthz
 
 WORKDIR /pilot/
 ENV PILOT_TYPE=filebeat
-ENV LD_LIBRARY_PATH=/host/usr/local/lib:/usr/local/Ascend/driver/lib64:/host/usr/local/Ascend/driver/lib64:/usr/local/dcmi:/host/usr/lib/:/usr/lib64:/usr/local/neuware/lib64:/host/usr/local/neuware/lib64:$LD_LIBRARY_PATH
+ENV LD_LIBRARY_PATH=/usr/lib/x86_64-linux-gnu:/usr/lib64:/usr/lib:/usr/local/Ascend/driver/lib64:/host/usr/local/Ascend/driver/lib64:/usr/local/dcmi:/host/usr/lib/:/host/usr/lib64/:/usr/local/neuware/lib64:/host/usr/local/neuware/lib64:/host/usr/local/lib:$LD_LIBRARY_PATH
 ENTRYPOINT ["python3","/pilot/entrypoint"]

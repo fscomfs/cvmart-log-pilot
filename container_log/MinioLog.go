@@ -17,7 +17,7 @@ type MinioLog struct {
 
 func (m *MinioLog) Start(ctx context.Context, def *ConnectDef) error {
 
-	object, err := utils.MinioClient.GetObject(ctx, m.bucketName, m.minioObjectName, minio.GetObjectOptions{})
+	object, err := utils.GetMinioClient().GetObject(ctx, m.bucketName, m.minioObjectName, minio.GetObjectOptions{})
 	if err != nil {
 		def.WriteMsg <- []byte(err.Error() + "\n")
 		m.closed = true

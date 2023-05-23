@@ -5,6 +5,7 @@ import (
 	log "github.com/Sirupsen/logrus"
 	"github.com/fscomfs/cvmart-log-pilot/config"
 	"github.com/fscomfs/cvmart-log-pilot/pilot"
+	proxy "github.com/fscomfs/cvmart-log-pilot/proxy"
 	"github.com/fscomfs/cvmart-log-pilot/server"
 	"github.com/fscomfs/cvmart-log-pilot/utils"
 	"io/ioutil"
@@ -45,16 +46,19 @@ func main() {
 	}
 	configInit()
 	go server.Handler()
-	//if config.GlobConfig.EnableProxy {
-	//	go proxy.Run("http")
-	//}
+	if config.GlobConfig.EnableProxy {
+		proxy.InitProxy()
+		go proxy.Run("http")
+	}
 	log.Printf("ListenAndServe %+v", config.GlobConfig.ServerPort)
 	log.Fatal(pilot.Run(string(b), baseDir))
 
 }
 
 func configInit() {
+	utils.InitConfig()
 	utils.InitProxyHttpClient()
 	utils.InitMinioClient()
 	utils.InitFileBeatClient()
+	utils.InitK8sClient()
 }

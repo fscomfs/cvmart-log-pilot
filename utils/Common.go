@@ -12,10 +12,13 @@ import (
 	"github.com/minio/minio-go/v7"
 	"github.com/minio/minio-go/v7/pkg/credentials"
 	"github.com/spf13/cast"
+	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/rest"
 	"math/rand"
 	"net"
 	"net/http"
 	"net/url"
+	"regexp"
 	"strings"
 )
 
@@ -38,15 +41,17 @@ type BaseResult struct {
 	Data   interface{} `json:"data"`
 }
 
-var MinioClient *minio.Client
-var FileBeatClient *http.Client
-var ProxyHttpClient *http.Client
-var RemoteProxyUrl *url.URL
+var minioClient *minio.Client
+var fileBeatClient *http.Client
+var proxyHttpClient *http.Client
+var httpClient *http.Client
+var remoteProxyUrl *url.URL
+var k8sClient *kubernetes.Clientset
 
-func init() {
+func InitConfig() {
 	if config.GlobConfig.RemoteProxyHost != "" && config.GlobConfig.EnableProxy {
 		if proxyUrl, error := url.Parse(config.GlobConfig.RemoteProxyHost); error == nil {
-			RemoteProxyUrl = proxyUrl
+			remoteProxyUrl = proxyUrl
 		} else {
 			log.Warnf("remoteProxyHost format error", error)
 		}
@@ -81,10 +86,11 @@ func NewDockerClient(dockerHost string) (client *docker.Client) {
 		}
 		transport := new(http.Transport)
 		if hostURL, error := docker.ParseHostURL(dockerHost); error == nil {
-			if RemoteProxyUrl != nil {
-				transport.Proxy = http.ProxyURL(RemoteProxyUrl)
-			}
+
 			sockets.ConfigureTransport(transport, hostURL.Scheme, hostURL.Host)
+			if UseProxy(strings.TrimPrefix(dockerHost, "http://")) {
+				transport.Proxy = http.ProxyURL(remoteProxyUrl)
+			}
 			httpClient := &http.Client{
 				Transport:     transport,
 				CheckRedirect: docker.CheckRedirect,
@@ -106,15 +112,23 @@ func NewDockerClient(dockerHost string) (client *docker.Client) {
 
 func InitProxyHttpClient() {
 	transport := new(http.Transport)
-	if RemoteProxyUrl != nil {
-		transport.Proxy = http.ProxyURL(RemoteProxyUrl)
+	if remoteProxyUrl != nil {
+		transport.Proxy = http.ProxyURL(remoteProxyUrl)
 	}
 	sockets.ConfigureTransport(transport, "http", "")
 	httpClient := &http.Client{
 		Transport:     transport,
 		CheckRedirect: docker.CheckRedirect,
 	}
-	ProxyHttpClient = httpClient
+	proxyHttpClient = httpClient
+}
+
+func GetHttpClient(host string) *http.Client {
+	if UseProxy(host) {
+		return proxyHttpClient
+	} else {
+		return httpClient
+	}
 }
 
 func InitFileBeatClient() {
@@ -125,7 +139,10 @@ func InitFileBeatClient() {
 			},
 		},
 	}
-	FileBeatClient = &httpc
+	fileBeatClient = &httpc
+}
+func GetFileBeatClient() *http.Client {
+	return fileBeatClient
 }
 
 func InitMinioClient() {
@@ -136,9 +153,13 @@ func InitMinioClient() {
 		}); err != nil {
 			fmt.Printf("create minio client error:%+v", err)
 		} else {
-			MinioClient = client
+			minioClient = client
 		}
 	}
+}
+
+func GetMinioClient() *minio.Client {
+	return minioClient
 }
 
 func GetURLByHost(host string) string {
@@ -172,4 +193,48 @@ func LineConfound(line []byte, rsb bool) []byte {
 		}
 	}
 	return line
+}
+func GetK8sClient() *kubernetes.Clientset {
+	return k8sClient
+}
+func InitK8sClient() {
+	c, err := rest.InClusterConfig()
+	if err != nil {
+		c = &rest.Config{
+			Host:        config.GlobConfig.KubeApiUrl,
+			BearerToken: config.GlobConfig.KubeAuth.Token,
+			TLSClientConfig: rest.TLSClientConfig{
+				Insecure: true,
+			},
+		}
+	}
+	// create the clientset
+	clientset, err := kubernetes.NewForConfig(c)
+	if err != nil {
+		panic(err.Error())
+	}
+	k8sClient = clientset
+}
+
+func UseProxy(host string) bool {
+	if config.GlobConfig.EnableProxy && !config.GlobConfig.ProxyGlobal && config.GlobConfig.ProxyHostPattern != "" {
+		regex, err := regexp.Compile(config.GlobConfig.ProxyHostPattern)
+		if err != nil {
+			return true
+		}
+		return regex.MatchString(host)
+	}
+	if config.GlobConfig.RemoteProxyHost != "" && config.GlobConfig.ProxyGlobal {
+		return true
+	}
+	return false
+}
+
+func GetProxy(host string) func(*http.Request) (*url.URL, error) {
+	if UseProxy(host) {
+		return http.ProxyURL(remoteProxyUrl)
+	} else {
+		return nil
+	}
+
 }

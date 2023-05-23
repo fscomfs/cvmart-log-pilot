@@ -15,7 +15,6 @@ import (
 	k8sApi "k8s.io/api/core/v1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
-	"k8s.io/client-go/rest"
 	"log"
 	"net/http"
 	"net/url"
@@ -48,37 +47,14 @@ type StatsEntry struct {
 }
 
 var dockerClient = make(map[string]*docker.Client)
-var k8sClient *kubernetes.Clientset
 var daemonOSType string
-
-func init() {
-	initK8sClient()
-}
-func initK8sClient() {
-	c, err := rest.InClusterConfig()
-	if err != nil {
-		c = &rest.Config{
-			Host:        config.GlobConfig.KubeApiUrl,
-			BearerToken: config.GlobConfig.KubeAuth.Token,
-			TLSClientConfig: rest.TLSClientConfig{
-				Insecure: true,
-			},
-		}
-	}
-	// create the clientset
-	clientset, err := kubernetes.NewForConfig(c)
-	if err != nil {
-		panic(err.Error())
-	}
-	k8sClient = clientset
-}
 
 func NewDockerLog(dockerHost string) (LogMonitor, error) {
 	c := GetDockerClient(dockerHost)
 	return &DockerLog{
 		dockerHost: dockerHost,
 		client:     c,
-		k8sClient:  k8sClient,
+		k8sClient:  utils.GetK8sClient(),
 		closed:     false,
 	}, nil
 }
@@ -111,6 +87,26 @@ func GetPodProcess(status k8sApi.PodStatus) int {
 	return process
 }
 
+func GetPodErrorInfo(status k8sApi.PodStatus) (string, error) {
+	for _, v := range status.InitContainerStatuses {
+		if v.State.Terminated != nil && v.State.Terminated.ExitCode != 0 {
+			return v.State.Terminated.Reason, fmt.Errorf("init error %+v", v.State.Terminated.Message)
+		}
+		if v.State.Waiting != nil && v.State.Waiting.Reason != "" {
+			return v.State.Waiting.Reason, fmt.Errorf("init error %+v", v.State.Waiting.Message)
+		}
+	}
+	for _, v := range status.ContainerStatuses {
+		if v.State.Terminated != nil && v.State.Terminated.ExitCode != 0 {
+			return v.State.Terminated.Reason, fmt.Errorf("container error %+v", v.State.Terminated.Message)
+		}
+		if v.State.Waiting != nil && v.State.Waiting.Reason != "" {
+			return v.State.Waiting.Reason, fmt.Errorf("container error %+v", v.State.Waiting.Message)
+		}
+	}
+	return "", nil
+}
+
 func isContainer(def *ConnectDef) bool {
 	if def.LogParam.ContainerId != "" && def.LogParam.PodLabel == "" {
 		return true
@@ -127,18 +123,32 @@ func (d *DockerLog) Start(ctx context.Context, def *ConnectDef) error {
 				log.Printf("DockerLog closed id=%+v", def.Id)
 				return nil
 			}
-			podList, err := k8sClient.CoreV1().Pods("default").List(context.Background(), v1.ListOptions{
-				Watch:         false,
-				LabelSelector: "app=" + def.LogParam.PodLabel,
-			})
-
+			listOption := v1.ListOptions{
+				Watch: false,
+			}
+			if def.LogParam.PodName != "" {
+				listOption.FieldSelector = "metadata.name=" + def.LogParam.PodName
+			}
+			if def.LogParam.PodLabel != "" {
+				listOption.LabelSelector = "app=" + def.LogParam.PodLabel
+			}
+			podList, err := d.k8sClient.CoreV1().Pods("default").List(context.Background(), listOption)
 			if err != nil || len(podList.Items) == 0 {
+				if err != nil {
+					log.Printf("error:%+v", err)
+				}
 				def.write(logMessage([]byte("\rWait for task initiation...")))
-				time.Sleep(5 * time.Second)
+				time.Sleep(20 * time.Second)
 				continue
 			}
 			pod := podList.Items[0]
 			count := len(pod.Status.InitContainerStatuses) + len(pod.Status.ContainerStatuses)
+			reason, err := GetPodErrorInfo(pod.Status)
+			if err != nil {
+				def.write(logMessage([]byte("\rtask run fail:" + reason + "" + err.Error())))
+				time.Sleep(60 * time.Second)
+				continue
+			}
 			if pod.Status.Phase == "Pending" {
 				process := GetPodProcess(pod.Status)
 				if process == count {
@@ -156,7 +166,7 @@ func (d *DockerLog) Start(ctx context.Context, def *ConnectDef) error {
 						def.write(logMessage([]byte("\rtask init:" + fmt.Sprint(process) + string("/") + fmt.Sprint(count))))
 					}
 					containerId = strings.TrimPrefix(pod.Status.ContainerStatuses[0].ContainerID, "docker://")
-					dockerHost = pod.Status.HostIP + ":2375"
+					dockerHost = pod.Status.HostIP + ":" + fmt.Sprint(config.GlobConfig.DockerServerPort)
 					break
 				}
 			}
@@ -165,7 +175,7 @@ func (d *DockerLog) Start(ctx context.Context, def *ConnectDef) error {
 				def.write(logMessage([]byte("task run fail:" + pod.Status.Reason + "\n")))
 				return nil
 			}
-			time.Sleep(5 * time.Second)
+			time.Sleep(20 * time.Second)
 		}
 	} else {
 		containerId = def.LogParam.ContainerId
@@ -236,7 +246,11 @@ func containerGpuInfo(ctx context.Context, host string, containerID string, hand
 		}
 	}()
 	u := url.URL{Scheme: "ws", Host: host, Path: utils.API_CONTAINERGPUINFO}
-	c, r, err := websocket.DefaultDialer.Dial(u.String()+"?containerID="+containerID, nil)
+	d := websocket.Dialer{
+		Proxy:            utils.GetProxy(host),
+		HandshakeTimeout: 45 * time.Second,
+	}
+	c, r, err := d.DialContext(ctx, u.String()+"?containerID="+containerID, nil)
 	if err != nil {
 		if r != nil && r.StatusCode == http.StatusNoContent {
 			return false, fmt.Errorf("not content")
@@ -248,7 +262,7 @@ func containerGpuInfo(ctx context.Context, host string, containerID string, hand
 	for {
 		select {
 		case <-ctx.Done():
-			log.Printf("-----------gpu end----------------------")
+			log.Printf("-----------gpu End----------------------")
 			return false, nil
 		default:
 			_, content, err := c.ReadMessage()
@@ -281,7 +295,7 @@ func containerResourceInfo(ctx context.Context, client *docker.Client, container
 	for {
 		select {
 		case <-ctx.Done():
-			log.Printf("-----------resource----------------------")
+			log.Printf("-----------resource End----------------------")
 			return false, nil
 		default:
 			var (

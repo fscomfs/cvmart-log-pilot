@@ -11,6 +11,7 @@ type LogParam struct {
 	Operator       string `json:"operator"`
 	Tail           string `json:"tail"`
 	PodLabel       string `json:"podLabel"`
+	PodName        string `json:"podName"`
 	MinioObjName   string `json:"minioObjName"`
 	ExpirationTime int64  `json:"expirationTime"`
 	jwt.RegisteredClaims

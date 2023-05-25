@@ -10,6 +10,7 @@ type LogParam struct {
 	ContainerId    string `json:"containerId"`
 	Operator       string `json:"operator"`
 	Tail           string `json:"tail"`
+	TrackNo        string `json:"trackNo"`
 	PodLabel       string `json:"podLabel"`
 	PodName        string `json:"podName"`
 	MinioObjName   string `json:"minioObjName"`

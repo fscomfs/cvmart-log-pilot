@@ -23,6 +23,10 @@ var upgrader = websocket.Upgrader{
 func ContainerGpuInfoHandler(w http.ResponseWriter, r *http.Request) {
 	values := r.URL.Query()
 	containerID := values.Get("containerID")
+	if containerID == "" {
+		w.WriteHeader(http.StatusNoContent)
+		return
+	}
 	gpuInfoExecutor, _ := gpu.GetExecutor()
 	var index []string
 	if gpuInfoExecutor != nil {
@@ -43,7 +47,7 @@ func ContainerGpuInfoHandler(w http.ResponseWriter, r *http.Request) {
 					return
 				}
 			}
-			time.Sleep(2 * time.Second)
+			time.Sleep(5 * time.Second)
 		}
 
 	} else {

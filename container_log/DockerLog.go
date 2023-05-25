@@ -191,7 +191,7 @@ func (d *DockerLog) Start(ctx context.Context, def *ConnectDef) error {
 		tail = def.LogParam.Tail
 	}
 	go func() {
-		for {
+		for !d.closed {
 			h, _ := containerGpuInfo(ctx, strings.Split(dockerHost, ":")[0]+fmt.Sprintf(":%d", config.GlobConfig.ServerPort), containerId, func(res []byte) {
 				def.write(gpuMessage(res))
 			})
@@ -202,7 +202,7 @@ func (d *DockerLog) Start(ctx context.Context, def *ConnectDef) error {
 		}
 	}()
 	go func() {
-		for {
+		for !d.closed {
 			h, _ := containerResourceInfo(ctx, d.client, containerId, func(res []byte) {
 				def.write(resourceMessage(res))
 			})

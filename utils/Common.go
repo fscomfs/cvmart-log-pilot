@@ -20,6 +20,7 @@ import (
 	"net/url"
 	"regexp"
 	"strings"
+	"time"
 )
 
 const (
@@ -44,7 +45,6 @@ type BaseResult struct {
 var minioClient *minio.Client
 var fileBeatClient *http.Client
 var proxyHttpClient *http.Client
-var httpClient *http.Client
 var remoteProxyUrl *url.URL
 var k8sClient *kubernetes.Clientset
 
@@ -93,6 +93,7 @@ func NewDockerClient(dockerHost string) (client *docker.Client) {
 			}
 			httpClient := &http.Client{
 				Transport:     transport,
+				Timeout:       45 * time.Second,
 				CheckRedirect: docker.CheckRedirect,
 			}
 			c, err := docker.NewClient(dockerHost, "", httpClient, nil)
@@ -118,21 +119,19 @@ func InitProxyHttpClient() {
 	sockets.ConfigureTransport(transport, "http", "")
 	httpClient := &http.Client{
 		Transport:     transport,
+		Timeout:       45 * time.Second,
 		CheckRedirect: docker.CheckRedirect,
 	}
 	proxyHttpClient = httpClient
 }
 
 func GetHttpClient(host string) *http.Client {
-	if UseProxy(host) {
-		return proxyHttpClient
-	} else {
-		return httpClient
-	}
+	return proxyHttpClient
 }
 
 func InitFileBeatClient() {
 	httpc := http.Client{
+		Timeout: 45 * time.Second,
 		Transport: &http.Transport{
 			DialContext: func(_ context.Context, _, _ string) (net.Conn, error) {
 				return net.Dial("unix", DefaultFileBeatHost)

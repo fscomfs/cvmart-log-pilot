@@ -2,7 +2,6 @@ package Service
 
 import (
 	"bufio"
-	"encoding/base64"
 	"fmt"
 	"github.com/fscomfs/cvmart-log-pilot/config"
 	"github.com/fscomfs/cvmart-log-pilot/container_log"
@@ -14,6 +13,7 @@ import (
 	"io/ioutil"
 	"log"
 	"net/http"
+	url2 "net/url"
 	"path/filepath"
 	"strings"
 )
@@ -65,66 +65,83 @@ func LogHandler(w http.ResponseWriter, r *http.Request) {
 
 func DownloadLogHandler(w http.ResponseWriter, r *http.Request) {
 	values := r.URL.Query()
-	obj := values.Get("obj")
+	token := values.Get("token")
+	logParam, err := auth.Auth(token)
+	if err != nil {
+		w.Write([]byte(err.Error()))
+		w.WriteHeader(http.StatusUnauthorized)
+	}
 	w.Header().Set("Content-Type", "application/octet-stream")
-	w.Header().Set("content-Disposition", fmt.Sprintf("attachment;filename=%s", obj+".log"))
+
+	w.Header().Set("content-Disposition", fmt.Sprintf("attachment;filename=%s", filepath.Base(logParam.MinioObjName)))
 	defer func() {
 		if err := recover(); err != nil {
 			log.Printf("download log error %+v", err)
 		}
 	}()
-	if objByte, error := base64.StdEncoding.DecodeString(obj); error == nil {
-		objName := string(objByte)
-		if !strings.HasPrefix(objName, "/") {
-			objName = "/" + objName
-		}
-		objName = strings.Trim(objName, "\n")
-		_, fileName := filepath.Split(objName)
-		if fileName != "" {
-			w.Header().Set("content-Disposition", fmt.Sprintf("attachment;filename=%s", fileName))
-		} else {
-			w.Header().Set("content-Disposition", fmt.Sprintf("attachment;filename=%s", "cvmart-log.log"))
-		}
-		object, err := utils.GetMinioClient().GetObject(r.Context(), config.GlobConfig.Bucket, objName, minio.GetObjectOptions{})
-		if err == nil {
-			r := bufio.NewReader(object)
-			defer object.Close()
-			for {
-				line, e := r.ReadBytes('\n')
-				if e != nil {
-					if e != io.EOF {
-						w.Write([]byte(e.Error() + "\n"))
-					}
-					return
-				}
-				w.Write(utils.LineConfound(line, true))
+	objName := logParam.MinioObjName
+	if !strings.HasPrefix(objName, "/") {
+		objName = "/" + objName
+	}
+	objName = strings.Trim(objName, "\n")
+	object, err := utils.GetMinioClient().GetObject(r.Context(), config.GlobConfig.Bucket, objName, minio.GetObjectOptions{})
+	if err == nil {
+		defer object.Close()
+		buffer := make([]byte, 2048)
+		r := bufio.NewReader(object)
+		for {
+			if n, e := r.Read(buffer); e == nil && n > 0 {
+				w.Write(buffer[:n])
+			} else {
+				return
 			}
 		}
+	} else {
+		w.Write([]byte(err.Error()))
 	}
 }
 
 func UploadLogByTrackNo(w http.ResponseWriter, r *http.Request) {
 	values := r.URL.Query()
-	trackNo := values.Get("trackNo")
-	host := values.Get("host")
-	if host == "" {
+	token := values.Get("token")
+	logParam, err := auth.Auth(token)
+	if err != nil {
+		w.Write([]byte(err.Error()))
+		w.WriteHeader(http.StatusUnauthorized)
+		return
+	}
+	defer func() {
+		if err := recover(); err != nil {
+			log.Printf("uploadLogByTrackNo error:%+v", err)
+		}
+	}()
+	if logParam.Host == "" {
 		//localhost
-		if resp, err := utils.GetFileBeatClient().Get(utils.FileBeatUpload + "?trackNo=" + trackNo); err == nil {
+		if resp, err := utils.GetFileBeatClient().Get(utils.FileBeatUpload + "?trackNo=" + logParam.TrackNo); err == nil {
 			content, _ := ioutil.ReadAll(resp.Body)
 			re := string(content)
 			if re == "1" { //success
 				utils.SUCCESS_RES("success", re, w)
-				log.Printf("upload success trackNo=%+v", trackNo)
+				log.Printf("upload success trackNo=%+v", logParam.TrackNo)
 			} else { //fail
 				utils.SUCCESS_RES("fail", re, w)
-				log.Printf("upload fail trackNo=%+v", trackNo)
+				log.Printf("upload fail trackNo=%+v", logParam.TrackNo)
 			}
 		} else {
 			log.Printf("request remote uploadFile fail error %+v", err)
 			w.WriteHeader(http.StatusBadRequest)
 		}
 	} else {
-		resp, err := utils.GetHttpClient(host).Get(utils.GetURLByHost(host) + utils.API_UPLOADLOGBYTRACKNO + "?trackNo=" + trackNo)
+		host := logParam.Host
+		logParam.Host = ""
+		t, e := auth.GeneratorToken(*logParam)
+		if e != nil {
+			w.Write([]byte(err.Error()))
+			w.WriteHeader(http.StatusUnauthorized)
+			return
+		}
+		url := utils.GetURLByHost(host) + utils.API_UPLOADLOGBYTRACKNO + "?token=" + url2.QueryEscape(t)
+		resp, err := utils.GetHttpClient(host).Get(url)
 		if err != nil {
 			w.WriteHeader(http.StatusBadRequest)
 			log.Printf("request uploadLogByTrackNo proxy error %+v", err)

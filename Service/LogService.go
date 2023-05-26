@@ -2,6 +2,8 @@ package Service
 
 import (
 	"bufio"
+	"bytes"
+	"encoding/json"
 	"fmt"
 	"github.com/fscomfs/cvmart-log-pilot/config"
 	"github.com/fscomfs/cvmart-log-pilot/container_log"
@@ -13,7 +15,6 @@ import (
 	"io/ioutil"
 	"log"
 	"net/http"
-	url2 "net/url"
 	"path/filepath"
 	"strings"
 )
@@ -29,6 +30,20 @@ type ConnectDef struct {
 	CloseConn  chan bool
 	Connect    *websocket.Conn
 	LogMonitor container_log.LogMonitor
+}
+
+type UploadLogParam struct {
+	Token         string `json:"token"`
+	Message       string `json:"message"`
+	ContainerName string `json:"containerName"`
+	MinioObjName  string `json:"minioObjName"`
+}
+
+type LocalUploadLogParam struct {
+	TrackNo       string `json:"trackNo"`
+	Message       string `json:"message"`
+	ContainerName string `json:"containerName"`
+	MinioObjName  string `json:"minioObjName"`
 }
 
 var connectHub = ConnectHub{
@@ -102,22 +117,35 @@ func DownloadLogHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func UploadLogByTrackNo(w http.ResponseWriter, r *http.Request) {
-	values := r.URL.Query()
-	token := values.Get("token")
-	logParam, err := auth.Auth(token)
-	if err != nil {
-		w.Write([]byte(err.Error()))
-		w.WriteHeader(http.StatusUnauthorized)
-		return
-	}
 	defer func() {
 		if err := recover(); err != nil {
 			log.Printf("uploadLogByTrackNo error:%+v", err)
 		}
 	}()
+	param := UploadLogParam{}
+	err := json.NewDecoder(r.Body).Decode(param)
+	if err != nil {
+		log.Printf("upload log parse param fail %+v", err)
+	}
+
+	logParam, err := auth.Auth(param.Token)
+	if err != nil {
+		w.Write([]byte(err.Error()))
+		w.WriteHeader(http.StatusUnauthorized)
+		return
+	}
+
 	if logParam.Host == "" {
 		//localhost
-		if resp, err := utils.GetFileBeatClient().Get(utils.FileBeatUpload + "?trackNo=" + logParam.TrackNo); err == nil {
+		p := LocalUploadLogParam{
+			TrackNo: logParam.TrackNo,
+			Message: param.Message,
+		}
+		jsonString, err := json.Marshal(p)
+		if err != nil {
+			log.Printf("uploadLogByTrackNo marshal error %+v", err)
+		}
+		if resp, err := utils.GetFileBeatClient().Post(utils.FileBeatUpload, "application/json", bytes.NewBuffer(jsonString)); err == nil {
 			content, _ := ioutil.ReadAll(resp.Body)
 			re := string(content)
 			if re == "1" { //success
@@ -135,13 +163,18 @@ func UploadLogByTrackNo(w http.ResponseWriter, r *http.Request) {
 		host := logParam.Host
 		logParam.Host = ""
 		t, e := auth.GeneratorToken(*logParam)
+		param.Token = t
+		jsonString, err := json.Marshal(param)
+		if err != nil {
+			log.Printf("uploadLogByTrackNo marshal error %+v", err)
+		}
 		if e != nil {
 			w.Write([]byte(err.Error()))
 			w.WriteHeader(http.StatusUnauthorized)
 			return
 		}
-		url := utils.GetURLByHost(host) + utils.API_UPLOADLOGBYTRACKNO + "?token=" + url2.QueryEscape(t)
-		resp, err := utils.GetHttpClient(host).Get(url)
+		url := utils.GetURLByHost(host) + utils.API_UPLOADLOGBYTRACKNO
+		resp, err := utils.GetHttpClient(host).Post(url, "application/json", bytes.NewBuffer(jsonString))
 		if err != nil {
 			w.WriteHeader(http.StatusBadRequest)
 			log.Printf("request uploadLogByTrackNo proxy error %+v", err)

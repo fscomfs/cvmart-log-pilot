@@ -35,7 +35,7 @@ var connectHub = ConnectHub{
 }
 
 func RegistryConnect(id string, logParam *LogParam, conn *websocket.Conn) {
-	log.Printf("registry podLabel:%+v,containerId:%+v,conn %+v", logParam.PodLabel, logParam.ContainerId, logParam)
+	log.Printf("registry id:%+v,podLabel:%+v,containerId:%+v,conn %+v", id, logParam.PodLabel, logParam.ContainerId, logParam)
 	ctx, cancel := context.WithCancel(context.Background())
 	c := ConnectDef{
 		Id:          id,
@@ -64,6 +64,13 @@ func destroy(id string) {
 	}
 
 }
+func (c *ConnectDef) writeMid(message []byte) {
+	c.mutex.Lock()
+	defer c.mutex.Unlock()
+	if c.WriteMsg != nil && !c.closed {
+		c.WriteMsg <- message
+	}
+}
 func (c *ConnectDef) write(message []byte) {
 	c.mutex.Lock()
 	defer c.mutex.Unlock()
@@ -83,15 +90,17 @@ func (c *ConnectDef) write(message []byte) {
 			c.timeAfter.Stop()
 		}
 		c.timeAfter = time.AfterFunc(600*time.Millisecond, func() {
-			c.writeMid()
+			c.flush(true)
 		})
 	}
 
 }
 
-func (c *ConnectDef) writeMid() {
-	c.mutex.Lock()
-	defer c.mutex.Unlock()
+func (c *ConnectDef) flush(lock bool) {
+	if lock {
+		c.mutex.Lock()
+		defer c.mutex.Unlock()
+	}
 	if c.WriteMsg != nil && !c.closed {
 		if len(c.msgCache) > 0 {
 			for s, i := range c.msgCache {
@@ -169,13 +178,20 @@ func (c *ConnectDef) onClose() {
 }
 
 var LOG_MESSAGE = []byte{'1', '0', '0', '0'}
+var LOG_STAT_MESSAGE = []byte{'0', '0', '0', '0'}
 var RESOURCE_MESSAGE = []byte{'1', '1', '0', '0'}
 var GPU_MESSAGE = []byte{'1', '1', '1', '0'}
 
 func logMessage(message []byte) []byte {
+	if len(message) > 1 && message[0] == ' ' {
+		return append(LOG_MESSAGE, utils.LineConfound(message[1:], false)...)
+	}
 	return append(LOG_MESSAGE, utils.LineConfound(message, false)...)
 }
 
+func logStatMessage(message []byte) []byte {
+	return append(LOG_STAT_MESSAGE, message...)
+}
 func resourceMessage(message []byte) []byte {
 	return append(RESOURCE_MESSAGE, message...)
 }

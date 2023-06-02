@@ -71,7 +71,7 @@ func SUCCESS_RES(msg string, data interface{}, w http.ResponseWriter) {
 func FAIL_RES(msg string, data interface{}, w http.ResponseWriter) {
 	w.Header().Set("Content-Type", "application-json")
 	res := BaseResult{
-		Code: SUCCESS_CODE,
+		Code: FAIL_CODE,
 		Msg:  msg,
 		Data: data,
 	}

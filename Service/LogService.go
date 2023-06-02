@@ -123,7 +123,7 @@ func UploadLogByTrackNo(w http.ResponseWriter, r *http.Request) {
 		}
 	}()
 	param := UploadLogParam{}
-	err := json.NewDecoder(r.Body).Decode(param)
+	err := json.NewDecoder(r.Body).Decode(&param)
 	if err != nil {
 		log.Printf("upload log parse param fail %+v", err)
 	}
@@ -152,7 +152,7 @@ func UploadLogByTrackNo(w http.ResponseWriter, r *http.Request) {
 				utils.SUCCESS_RES("success", re, w)
 				log.Printf("upload success trackNo=%+v", logParam.TrackNo)
 			} else { //fail
-				utils.SUCCESS_RES("fail", re, w)
+				utils.FAIL_RES("fail", re, w)
 				log.Printf("upload fail trackNo=%+v", logParam.TrackNo)
 			}
 		} else {

@@ -17,6 +17,7 @@ import (
 	"net/http"
 	"path/filepath"
 	"strings"
+	"time"
 )
 
 type ConnectHub struct {
@@ -138,13 +139,16 @@ func UploadLogByTrackNo(w http.ResponseWriter, r *http.Request) {
 	if logParam.Host == "" {
 		//localhost
 		p := LocalUploadLogParam{
-			TrackNo: logParam.TrackNo,
-			Message: param.Message,
+			TrackNo:       logParam.TrackNo,
+			Message:       param.Message,
+			ContainerName: param.ContainerName,
+			MinioObjName:  param.MinioObjName,
 		}
 		jsonString, err := json.Marshal(p)
 		if err != nil {
 			log.Printf("uploadLogByTrackNo marshal error %+v", err)
-		}
+		} //wait 3 second for log cache write
+		time.Sleep(3 * time.Second)
 		if resp, err := utils.GetFileBeatClient().Post(utils.FileBeatUpload, "application/json", bytes.NewBuffer(jsonString)); err == nil {
 			content, _ := ioutil.ReadAll(resp.Body)
 			re := string(content)

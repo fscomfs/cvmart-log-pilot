@@ -30,7 +30,7 @@ filebeat:
       enabled: true
       path: /config/filebeat/prospectors.d/*yml
       reload.enabled: true
-      reload.period: 2s
+      reload.period: 1s
   registry:
     path: "/out/filebeat/registry"
     file_permissions: 0600

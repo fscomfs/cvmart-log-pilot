@@ -199,6 +199,7 @@ func GetK8sClient() *kubernetes.Clientset {
 func InitK8sClient() {
 	c, err := rest.InClusterConfig()
 	if err != nil {
+		log.Info("create k8s client from config")
 		c = &rest.Config{
 			Host:        config.GlobConfig.KubeApiUrl,
 			BearerToken: config.GlobConfig.KubeAuth.Token,

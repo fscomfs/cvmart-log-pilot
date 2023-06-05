@@ -3,7 +3,9 @@
   enabled: true
   paths:
       - {{ .HostDir }}/{{ .File }}
-  scan_frequency: 5s
+  scan_frequency: 1s
+  backoff_factor: 1
+  max_backoff: 1s
   fields_under_root: true
   {{if .Stdout}}
   docker-json: false
@@ -24,8 +26,8 @@
   {{range $key, $value := .CustomConfigs}}
   {{ $key }}: {{ $value }}
   {{end}}
-  tail_files: true
-  close_inactive: 2h
+  tail_files: false
+  close_inactive: 8h
   close_eof: false
   close_removed: true
   clean_removed: true

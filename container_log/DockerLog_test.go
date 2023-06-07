@@ -79,6 +79,10 @@ func TestLog(t *testing.T) {
 
 func TestR(t *testing.T) {
 	reg, _ := regexp.Compile(`172\.16\..`)
+	res := make(map[string]string)
+	indexs := 0
+	res[string(indexs)] = "0kkkk"
+	log.Printf("info:%+v", res)
 	fmt.Printf("d:%+v", reg.MatchString("172.16.1115"))
 }
 

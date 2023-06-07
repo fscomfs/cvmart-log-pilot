@@ -6,6 +6,7 @@ import (
 	"github.com/fscomfs/cvmart-log-pilot/gpu/atlas/common"
 	"github.com/fscomfs/cvmart-log-pilot/gpu/atlas/dcmi"
 	"github.com/fscomfs/cvmart-log-pilot/gpu/atlas/dsmi"
+	"github.com/spf13/cast"
 	_ "github.com/spf13/cast"
 	"log"
 	"strings"
@@ -58,7 +59,9 @@ func (a *AtlasInfo) ContainerDevices(containerID string) []string {
 func (a *AtlasInfo) Info(indexs []string) (map[string]gpu.InfoObj, error) {
 	var res = make(map[string]gpu.InfoObj)
 	all, err := a.InfoAll()
+	//log.Printf("all info indexs:%+v,all:%+v", indexs, all)
 	if err != nil {
+		log.Printf("all info error: %+v", err)
 		return res, err
 	}
 	for s, obj := range all {
@@ -84,7 +87,7 @@ func (a *AtlasInfo) InfoAll() (map[string]gpu.InfoObj, error) {
 				for deviceId := int32(0); deviceId < deviceIdMax; deviceId++ {
 					memoryInfo, _ := dc.DcGetMemoryInfo(carIndex, deviceId)
 					coreRate, _ := dc.DcGetDeviceUtilizationRate(carIndex, deviceId, common.AICore)
-					res[string(index)] = gpu.InfoObj{
+					res[cast.ToString(index)] = gpu.InfoObj{
 						Total:   memoryInfo.MemorySize * uint64(1000*1000),
 						Used:    (memoryInfo.MemorySize - memoryInfo.MemoryAvailable) * uint64(1000*1000),
 						GpuUtil: uint32(coreRate),
@@ -102,7 +105,7 @@ func (a *AtlasInfo) InfoAll() (map[string]gpu.InfoObj, error) {
 		defer dsmi.Shutdown()
 		if allInfo, error := dsmi.AllDeviceInfo(); error != nil {
 			for k := range allInfo {
-				res[string(k)] = gpu.InfoObj{
+				res[cast.ToString(k)] = gpu.InfoObj{
 					Total:   allInfo[k].Total,
 					Used:    allInfo[k].Used,
 					GpuUtil: allInfo[k].CoreRate,

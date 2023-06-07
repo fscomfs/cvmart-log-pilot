@@ -43,7 +43,7 @@ func ContainerGpuInfoHandler(w http.ResponseWriter, r *http.Request) {
 				jsonStr, _ := json.Marshal(res)
 				err := conn.WriteMessage(websocket.TextMessage, jsonStr)
 				if err != nil {
-					log.Printf("-----------gpu info end----------------------")
+					log.Printf("-----------gpu info end----------------- err:%+v", err)
 					return
 				}
 			}

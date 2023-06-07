@@ -45,6 +45,7 @@ type BaseResult struct {
 var minioClient *minio.Client
 var fileBeatClient *http.Client
 var proxyHttpClient *http.Client
+var httpClient *http.Client
 var remoteProxyUrl *url.URL
 var k8sClient *kubernetes.Clientset
 
@@ -93,7 +94,6 @@ func NewDockerClient(dockerHost string) (client *docker.Client) {
 			}
 			httpClient := &http.Client{
 				Transport:     transport,
-				Timeout:       45 * time.Second,
 				CheckRedirect: docker.CheckRedirect,
 			}
 			c, err := docker.NewClient(dockerHost, "", httpClient, nil)
@@ -117,16 +117,26 @@ func InitProxyHttpClient() {
 		transport.Proxy = http.ProxyURL(remoteProxyUrl)
 	}
 	sockets.ConfigureTransport(transport, "http", "")
-	httpClient := &http.Client{
+	httpClientTemp := &http.Client{
 		Transport:     transport,
-		Timeout:       45 * time.Second,
 		CheckRedirect: docker.CheckRedirect,
 	}
-	proxyHttpClient = httpClient
+	proxyHttpClient = httpClientTemp
+
+	transport2 := new(http.Transport)
+	sockets.ConfigureTransport(transport2, "http", "")
+	httpClient2 := &http.Client{
+		Transport:     transport,
+		CheckRedirect: docker.CheckRedirect,
+	}
+	httpClient = httpClient2
 }
 
 func GetHttpClient(host string) *http.Client {
-	return proxyHttpClient
+	if UseProxy(host) {
+		return proxyHttpClient
+	}
+	return httpClient
 }
 
 func InitFileBeatClient() {

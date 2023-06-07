@@ -119,69 +119,63 @@ func (d *DockerLog) Start(ctx context.Context, def *ConnectDef) error {
 	var dockerHost string
 	if !isContainer(def) {
 		for {
-			select {
-			case <-ctx.Done():
+			if d.closed {
 				log.Printf("DockerLog closed id=%+v", def.Id)
 				return nil
-			default:
-				//if d.closed {
-				//	log.Printf("DockerLog closed id=%+v", def.Id)
-				//	return nil
-				//}
-				listOption := v1.ListOptions{
-					Watch: false,
-				}
-				if def.LogParam.PodName != "" {
-					listOption.FieldSelector = "metadata.name=" + def.LogParam.PodName
-				}
-				if def.LogParam.PodLabel != "" {
-					listOption.LabelSelector = "app=" + def.LogParam.PodLabel
-				}
-				podList, err := d.k8sClient.CoreV1().Pods("default").List(context.Background(), listOption)
-				if err != nil || len(podList.Items) == 0 {
-					if err != nil {
-						log.Printf("error:%+v", err)
-					}
-					def.writeMid(logStatMessage([]byte("\rWait for task create...")))
-					time.Sleep(20 * time.Second)
-					continue
-				}
-				pod := podList.Items[0]
-				count := len(pod.Status.InitContainerStatuses) + len(pod.Status.ContainerStatuses)
-				reason, err := GetPodErrorInfo(pod.Status)
+			}
+			listOption := v1.ListOptions{
+				Watch: false,
+			}
+			if def.LogParam.PodName != "" {
+				listOption.FieldSelector = "metadata.name=" + def.LogParam.PodName
+			}
+			if def.LogParam.PodLabel != "" {
+				listOption.LabelSelector = "app=" + def.LogParam.PodLabel
+			}
+			podList, err := d.k8sClient.CoreV1().Pods("default").List(context.Background(), listOption)
+			if err != nil || len(podList.Items) == 0 {
 				if err != nil {
-					def.writeMid(logStatMessage([]byte("\rtask run fail:" + reason + "" + err.Error())))
-					time.Sleep(60 * time.Second)
-					continue
+					log.Printf("error:%+v", err)
 				}
-				if pod.Status.Phase == "Pending" {
+				def.writeMid(logStatMessage([]byte("\rWait for task create...")))
+				time.Sleep(20 * time.Second)
+				continue
+			}
+			pod := podList.Items[0]
+			count := len(pod.Status.InitContainerStatuses) + len(pod.Status.ContainerStatuses)
+			reason, err := GetPodErrorInfo(pod.Status)
+			if err != nil {
+				def.writeMid(logStatMessage([]byte("\rtask run fail:" + reason + "" + err.Error())))
+				time.Sleep(60 * time.Second)
+				continue
+			}
+			if pod.Status.Phase == "Pending" {
+				process := GetPodProcess(pod.Status)
+				if process == count {
+					def.writeMid(logStatMessage([]byte("\rtask init:" + fmt.Sprint(process) + string("/") + fmt.Sprint(count) + "\n")))
+				} else {
+					def.writeMid(logStatMessage([]byte("\rtask init:" + fmt.Sprint(process) + string("/") + fmt.Sprint(count))))
+				}
+			}
+			if pod.Status.Phase == "Running" || pod.Status.Phase == "Succeeded" {
+				if len(pod.Status.ContainerStatuses) > 0 {
 					process := GetPodProcess(pod.Status)
 					if process == count {
 						def.writeMid(logStatMessage([]byte("\rtask init:" + fmt.Sprint(process) + string("/") + fmt.Sprint(count) + "\n")))
 					} else {
 						def.writeMid(logStatMessage([]byte("\rtask init:" + fmt.Sprint(process) + string("/") + fmt.Sprint(count))))
 					}
+					containerId = strings.TrimPrefix(pod.Status.ContainerStatuses[0].ContainerID, "docker://")
+					dockerHost = pod.Status.HostIP + ":" + fmt.Sprint(config.GlobConfig.DockerServerPort)
+					break
 				}
-				if pod.Status.Phase == "Running" || pod.Status.Phase == "Succeeded" {
-					if len(pod.Status.ContainerStatuses) > 0 {
-						process := GetPodProcess(pod.Status)
-						if process == count {
-							def.writeMid(logStatMessage([]byte("\rtask init:" + fmt.Sprint(process) + string("/") + fmt.Sprint(count) + "\n")))
-						} else {
-							def.writeMid(logStatMessage([]byte("\rtask init:" + fmt.Sprint(process) + string("/") + fmt.Sprint(count))))
-						}
-						containerId = strings.TrimPrefix(pod.Status.ContainerStatuses[0].ContainerID, "docker://")
-						dockerHost = pod.Status.HostIP + ":" + fmt.Sprint(config.GlobConfig.DockerServerPort)
-						break
-					}
-				}
-				if pod.Status.Phase == "Failed" || pod.Status.Phase == "Unknown" {
-					log.Printf("pod status:%+v", pod.Status.Message)
-					def.writeMid(logStatMessage([]byte("task run fail:" + pod.Status.Reason + "\n")))
-					return nil
-				}
-				time.Sleep(20 * time.Second)
 			}
+			if pod.Status.Phase == "Failed" || pod.Status.Phase == "Unknown" {
+				log.Printf("pod status:%+v", pod.Status.Message)
+				def.writeMid(logStatMessage([]byte("task run fail:" + pod.Status.Reason + "\n")))
+				return nil
+			}
+			time.Sleep(20 * time.Second)
 
 		}
 	} else {
@@ -237,9 +231,12 @@ func (d *DockerLog) Start(ctx context.Context, def *ConnectDef) error {
 	}()
 	r := bufio.NewReader(reader)
 	var out = ioutil.Discard
-	StdCopy(out, r, def.write)
+	_, errCopy := StdCopy(out, r, def.write)
+	if errCopy != nil {
+		def.writeMid(logStatMessage([]byte(errCopy.Error())))
+	}
 	def.flush(false)
-	def.writeMid(logStatMessage([]byte("END")))
+	def.writeMid(logStatMessage([]byte("\nLOG_END")))
 	log.Printf("tail log process end id=%+v", def.Id)
 	return nil
 }

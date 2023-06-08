@@ -7,6 +7,9 @@ package bmctl
 #include <getopt.h>
 #include <unistd.h>
 #include "bm_uapi.h"
+int getBmSmiAttrSize(){
+  return sizeof(struct bm_smi_attr);
+};
 */
 import "C"
 import (
@@ -18,7 +21,7 @@ import (
 )
 
 const ioctlMAGIC = 'q'
-const DEVICE string = "/host/dev/bmdev-ctl" /* 设备文件*/
+const DEVICE string = "/dev/bmdev-ctl" /* 设备文件*/
 func BMCTL_GET_DEV_CNT() cgoioctl.R {
 	return cgoioctl.R{Type: ioctlMAGIC, Nr: 0x0, Size: 8}
 }
@@ -65,11 +68,12 @@ func GetAllDeviceInfo() map[int]DeviceInfo {
 			var attr C.struct_bm_smi_attr
 			attr.dev_id = C.int(i)
 			err = BMCTL_GET_SMI_ATTR().Exec(fd, unsafe.Pointer(&attr))
+			log.Printf("BMCTL_GET_SMI_ATTR result %+v", attr)
 			infos[i] = DeviceInfo{
 				DevId:    int32(attr.dev_id),
 				ChipId:   int32(attr.chip_id),
-				MemUsed:  int64(attr.mem_used) * 1024 * 1024,
-				MemTotal: int64(attr.mem_total) * 1024 * 1024,
+				MemUsed:  int64(attr.mem_used) * int64(1024*1024),
+				MemTotal: int64(attr.mem_total) * int64(1024*1024),
 				TpuUtil:  int32(attr.tpu_util),
 			}
 		}

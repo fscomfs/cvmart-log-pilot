@@ -4,6 +4,7 @@ import (
 	"context"
 	"github.com/fscomfs/cvmart-log-pilot/gpu"
 	"github.com/fscomfs/cvmart-log-pilot/gpu/sophgo/bmctl"
+	"github.com/spf13/cast"
 	_ "github.com/spf13/cast"
 	"log"
 	"regexp"
@@ -53,16 +54,20 @@ func (a *SophgoInfo) Info(indexs []string) (map[string]gpu.InfoObj, error) {
 	for _, v := range allInfo {
 		e := false
 		for _, index := range indexs {
-			if index == string(v.DevId) {
+			if index == cast.ToString(v.DevId) {
 				e = true
 			}
 		}
 		if e {
-			res[string(v.DevId)] = gpu.InfoObj{
-				Total:   uint64(v.MemTotal),
-				Used:    uint64(v.MemUsed),
+			//var MemUtil uint32
+			//if v.MemTotal > 0 {
+			//	MemUtil = uint32((v.MemUsed / v.MemTotal) * 100)
+			//}
+			res[cast.ToString(v.DevId)] = gpu.InfoObj{
+				//Total:   uint64(v.MemTotal),
+				//Used:    uint64(v.MemUsed),
 				GpuUtil: uint32(v.TpuUtil),
-				MemUtil: uint32((v.MemUsed / v.MemTotal) * 100),
+				//MemUtil: MemUtil,
 			}
 		}
 
@@ -74,7 +79,7 @@ func (a *SophgoInfo) InfoAll() (map[string]gpu.InfoObj, error) {
 	var res = make(map[string]gpu.InfoObj)
 	allInfo := bmctl.GetAllDeviceInfo()
 	for _, v := range allInfo {
-		res[string(v.DevId)] = gpu.InfoObj{
+		res[cast.ToString(v.DevId)] = gpu.InfoObj{
 			Total:   uint64(v.MemTotal),
 			Used:    uint64(v.MemUsed),
 			GpuUtil: uint32(v.TpuUtil),

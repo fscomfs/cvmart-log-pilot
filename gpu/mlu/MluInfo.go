@@ -77,7 +77,7 @@ func (a *MluInfo) InfoAll() (map[string]gpu.InfoObj, error) {
 			pyUsed, pyTotal, _, _, err := client.GetDeviceMemory(cast.ToUint(i))
 			avgUtil, _, err2 := client.GetDeviceUtil(cast.ToUint(i))
 			if err == nil && err2 == nil {
-				res[string(i)] = gpu.InfoObj{
+				res[cast.ToString(i)] = gpu.InfoObj{
 					Total:   uint64(pyTotal * 1024 * 1024),
 					Used:    uint64(pyUsed * 1024 * 1024),
 					GpuUtil: uint32(avgUtil),

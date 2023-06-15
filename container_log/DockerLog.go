@@ -92,7 +92,7 @@ func GetPodErrorInfo(status k8sApi.PodStatus) (string, error) {
 		if v.State.Terminated != nil && v.State.Terminated.ExitCode != 0 {
 			return v.State.Terminated.Reason, fmt.Errorf("init error %+v", v.State.Terminated.Message)
 		}
-		if v.State.Waiting != nil && v.State.Waiting.Reason != "" {
+		if v.State.Waiting != nil && v.State.Waiting.Reason != "" && !strings.HasPrefix(v.State.Waiting.Reason, "PodInit") {
 			return v.State.Waiting.Reason, fmt.Errorf("init error %+v", v.State.Waiting.Message)
 		}
 	}
@@ -100,7 +100,7 @@ func GetPodErrorInfo(status k8sApi.PodStatus) (string, error) {
 		if v.State.Terminated != nil && v.State.Terminated.ExitCode != 0 {
 			return v.State.Terminated.Reason, fmt.Errorf("container error %+v", v.State.Terminated.Message)
 		}
-		if v.State.Waiting != nil && v.State.Waiting.Reason != "" {
+		if v.State.Waiting != nil && v.State.Waiting.Reason != "" && !strings.HasPrefix(v.State.Waiting.Reason, "PodInit") {
 			return v.State.Waiting.Reason, fmt.Errorf("container error %+v", v.State.Waiting.Message)
 		}
 	}

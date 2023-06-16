@@ -2,6 +2,7 @@ package atlas
 
 import (
 	"context"
+	"fmt"
 	"github.com/fscomfs/cvmart-log-pilot/gpu"
 	"github.com/fscomfs/cvmart-log-pilot/gpu/atlas/common"
 	"github.com/fscomfs/cvmart-log-pilot/gpu/atlas/dcmi"
@@ -56,8 +57,14 @@ func (a *AtlasInfo) ContainerDevices(containerID string) []string {
 	}
 	return deviceIds
 }
-func (a *AtlasInfo) Info(indexs []string) (map[string]gpu.InfoObj, error) {
-	var res = make(map[string]gpu.InfoObj)
+func (a *AtlasInfo) Info(indexs []string) (res map[string]gpu.InfoObj, reserror error) {
+	res = make(map[string]gpu.InfoObj)
+	defer func() {
+		if err := recover(); err != nil {
+			log.Printf("Info error recover %+v", err)
+			reserror = fmt.Errorf("Info error recover")
+		}
+	}()
 	all, err := a.InfoAll()
 	//log.Printf("all info indexs:%+v,all:%+v", indexs, all)
 	if err != nil {
@@ -75,6 +82,11 @@ func (a *AtlasInfo) Info(indexs []string) (map[string]gpu.InfoObj, error) {
 }
 func (a *AtlasInfo) InfoAll() (map[string]gpu.InfoObj, error) {
 	var res = make(map[string]gpu.InfoObj)
+	defer func() {
+		if err := recover(); err != nil {
+			log.Printf("Info All error recover %+v", err)
+		}
+	}()
 	if a.dcmi {
 		dc.DcInit()
 		defer dc.DcShutDown()
@@ -85,7 +97,11 @@ func (a *AtlasInfo) InfoAll() (map[string]gpu.InfoObj, error) {
 			for _, carIndex := range carList {
 				deviceIdMax, _ := dc.DcGetDeviceNumInCard(carIndex)
 				for deviceId := int32(0); deviceId < deviceIdMax; deviceId++ {
-					memoryInfo, _ := dc.DcGetMemoryInfo(carIndex, deviceId)
+					memoryInfo, errinfo := dc.DcGetMemoryInfo(carIndex, deviceId)
+					if errinfo != nil {
+						log.Printf("dcmi get memory info error carIndex=%+v,deviceId=%+v,error info=%+v", carIndex, deviceId, errinfo)
+						continue
+					}
 					coreRate, _ := dc.DcGetDeviceUtilizationRate(carIndex, deviceId, common.AICore)
 					res[cast.ToString(index)] = gpu.InfoObj{
 						Total:   memoryInfo.MemorySize * uint64(1000*1000),

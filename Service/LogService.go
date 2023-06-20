@@ -12,7 +12,6 @@ import (
 	"github.com/gorilla/websocket"
 	"github.com/minio/minio-go/v7"
 	"io"
-	"io/ioutil"
 	"log"
 	"net/http"
 	"path/filepath"
@@ -147,20 +146,19 @@ func UploadLogByTrackNo(w http.ResponseWriter, r *http.Request) {
 		jsonString, err := json.Marshal(p)
 		if err != nil {
 			log.Printf("uploadLogByTrackNo marshal error %+v", err)
-		} //wait 3 second for log cache write
-		time.Sleep(4 * time.Second)
+		}
+		//wait 3 second for log cache write
+		time.Sleep(3 * time.Second)
 		if resp, err := utils.GetFileBeatClient().Post(utils.FileBeatUpload, "application/json", bytes.NewBuffer(jsonString)); err == nil {
-			content, _ := ioutil.ReadAll(resp.Body)
-			re := string(content)
-			if re == "1" { //success
-				utils.SUCCESS_RES("success", re, w)
-				log.Printf("upload success trackNo=%+v", logParam.TrackNo)
-			} else { //fail
-				utils.FAIL_RES("fail", re, w)
-				log.Printf("upload fail trackNo=%+v", logParam.TrackNo)
+			var res UploadLogParam
+			if err := json.NewDecoder(resp.Body).Decode(&res); err == nil {
+				utils.SUCCESS_RES("success", res, w)
+			} else {
+				utils.FAIL_RES(err.Error(), nil, w)
 			}
 		} else {
 			log.Printf("request remote uploadFile fail error %+v", err)
+			utils.FAIL_RES(err.Error(), nil, w)
 			w.WriteHeader(http.StatusBadRequest)
 		}
 	} else {
@@ -173,13 +171,14 @@ func UploadLogByTrackNo(w http.ResponseWriter, r *http.Request) {
 			log.Printf("uploadLogByTrackNo marshal error %+v", err)
 		}
 		if e != nil {
-			w.Write([]byte(err.Error()))
+			utils.FAIL_RES(err.Error(), nil, w)
 			w.WriteHeader(http.StatusUnauthorized)
 			return
 		}
 		url := utils.GetURLByHost(host) + utils.API_UPLOADLOGBYTRACKNO
 		resp, err := utils.GetHttpClient(host).Post(url, "application/json", bytes.NewBuffer(jsonString))
 		if err != nil {
+			utils.FAIL_RES(err.Error(), nil, w)
 			w.WriteHeader(http.StatusBadRequest)
 			log.Printf("request uploadLogByTrackNo proxy error %+v", err)
 		} else {

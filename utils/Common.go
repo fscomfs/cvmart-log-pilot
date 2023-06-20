@@ -42,6 +42,11 @@ type BaseResult struct {
 	Data   interface{} `json:"data"`
 }
 
+type UploadByParamRes struct {
+	trackFlag  int `json:"trackFlag"`
+	uploadCode int `json:"uploadCode"`
+}
+
 var minioClient *minio.Client
 var fileBeatClient *http.Client
 var proxyHttpClient *http.Client

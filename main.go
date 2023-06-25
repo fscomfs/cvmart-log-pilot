@@ -61,4 +61,5 @@ func configInit() {
 	utils.InitMinioClient()
 	utils.InitFileBeatClient()
 	utils.InitK8sClient()
+	utils.InitRetryHttpClient()
 }

@@ -9,6 +9,7 @@ import (
 	docker "github.com/docker/docker/client"
 	"github.com/docker/go-connections/sockets"
 	"github.com/fscomfs/cvmart-log-pilot/config"
+	retryhttp "github.com/hashicorp/go-retryablehttp"
 	"github.com/minio/minio-go/v7"
 	"github.com/minio/minio-go/v7/pkg/credentials"
 	"github.com/spf13/cast"
@@ -53,6 +54,7 @@ var proxyHttpClient *http.Client
 var httpClient *http.Client
 var remoteProxyUrl *url.URL
 var k8sClient *kubernetes.Clientset
+var retryHttpClient *retryhttp.Client
 
 func InitConfig() {
 	if config.GlobConfig.RemoteProxyHost != "" && config.GlobConfig.EnableProxy {
@@ -64,8 +66,8 @@ func InitConfig() {
 	}
 }
 
-func SUCCESS_RES(msg string, data interface{}, w http.ResponseWriter) {
-	w.Header().Set("Content-Type", "application-json")
+func SUCCESS_RES(msg string, data interface{}, w http.ResponseWriter) []byte {
+	w.Header().Set("Content-Type", "application/json")
 	res := BaseResult{
 		Code: SUCCESS_CODE,
 		Msg:  msg,
@@ -73,9 +75,10 @@ func SUCCESS_RES(msg string, data interface{}, w http.ResponseWriter) {
 	}
 	c, _ := json.Marshal(&res)
 	w.Write(c)
+	return c
 }
-func FAIL_RES(msg string, data interface{}, w http.ResponseWriter) {
-	w.Header().Set("Content-Type", "application-json")
+func FAIL_RES(msg string, data interface{}, w http.ResponseWriter) []byte {
+	w.Header().Set("Content-Type", "application/json")
 	res := BaseResult{
 		Code: FAIL_CODE,
 		Msg:  msg,
@@ -83,6 +86,7 @@ func FAIL_RES(msg string, data interface{}, w http.ResponseWriter) {
 	}
 	c, _ := json.Marshal(&res)
 	w.Write(c)
+	return c
 }
 
 func NewDockerClient(dockerHost string) (client *docker.Client) {
@@ -97,11 +101,11 @@ func NewDockerClient(dockerHost string) (client *docker.Client) {
 			if UseProxy(strings.TrimPrefix(dockerHost, "http://")) {
 				transport.Proxy = http.ProxyURL(remoteProxyUrl)
 			}
-			httpClient := &http.Client{
+			httpClientTemp := &http.Client{
 				Transport:     transport,
 				CheckRedirect: docker.CheckRedirect,
 			}
-			c, err := docker.NewClient(dockerHost, "", httpClient, nil)
+			c, err := docker.NewClient(dockerHost, "", httpClientTemp, nil)
 			if err != nil {
 				log.Printf("ParseHostURL error %+v", error.Error())
 				return nil
@@ -146,7 +150,7 @@ func GetHttpClient(host string) *http.Client {
 
 func InitFileBeatClient() {
 	httpc := http.Client{
-		Timeout: 45 * time.Second,
+		Timeout: 120 * time.Second,
 		Transport: &http.Transport{
 			DialContext: func(_ context.Context, _, _ string) (net.Conn, error) {
 				return net.Dial("unix", DefaultFileBeatHost)
@@ -252,4 +256,20 @@ func GetProxy(host string) func(*http.Request) (*url.URL, error) {
 		return nil
 	}
 
+}
+
+func InitRetryHttpClient() {
+	retryHttpClient = retryhttp.NewClient()
+	httpClientTemp := &http.Client{
+		Timeout: 5 * time.Second,
+	}
+	retryHttpClient.HTTPClient = httpClientTemp
+	retryHttpClient.RetryMax = 8
+	retryHttpClient.RetryWaitMin = 2 * time.Second
+	retryHttpClient.RetryWaitMax = 60 * time.Second
+	retryHttpClient.CheckRetry = retryhttp.DefaultRetryPolicy
+}
+
+func GetRetryHttpClient() *retryhttp.Client {
+	return retryHttpClient
 }

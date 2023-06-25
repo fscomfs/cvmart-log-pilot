@@ -1,10 +1,11 @@
 package Service
 
 import (
-	"bufio"
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/avast/retry-go/v4"
 	"github.com/fscomfs/cvmart-log-pilot/config"
 	"github.com/fscomfs/cvmart-log-pilot/container_log"
 	"github.com/fscomfs/cvmart-log-pilot/utils"
@@ -12,10 +13,10 @@ import (
 	"github.com/gorilla/websocket"
 	"github.com/minio/minio-go/v7"
 	"io"
+	"io/ioutil"
 	"log"
 	"net/http"
 	"path/filepath"
-	"strings"
 	"time"
 )
 
@@ -25,11 +26,15 @@ type ConnectHub struct {
 
 type ConnectDef struct {
 	Id         string                  `json:"id"`
-	LogParam   *container_log.LogParam `json:"log_param"`
+	LogParam   *container_log.LogParam `json:"logParam"`
 	WriteMsg   chan []byte
 	CloseConn  chan bool
 	Connect    *websocket.Conn
 	LogMonitor container_log.LogMonitor
+}
+type UploadByParamRes struct {
+	TrackFlag  int `json:"trackFlag"`
+	UploadCode int `json:"uploadCode"`
 }
 
 type UploadLogParam struct {
@@ -37,6 +42,8 @@ type UploadLogParam struct {
 	Message       string `json:"message"`
 	ContainerName string `json:"containerName"`
 	MinioObjName  string `json:"minioObjName"`
+	CallBackUrl   string `json:"callBackUrl"`
+	Async         int    `json:"async"`
 }
 
 type LocalUploadLogParam struct {
@@ -44,6 +51,8 @@ type LocalUploadLogParam struct {
 	Message       string `json:"message"`
 	ContainerName string `json:"containerName"`
 	MinioObjName  string `json:"minioObjName"`
+	CallBackUrl   string `json:"callBackUrl"`
+	Async         int    `json:"async"`
 }
 
 var connectHub = ConnectHub{
@@ -87,7 +96,6 @@ func DownloadLogHandler(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusUnauthorized)
 	}
 	w.Header().Set("Content-Type", "application/octet-stream")
-
 	w.Header().Set("content-Disposition", fmt.Sprintf("attachment;filename=%s", filepath.Base(logParam.MinioObjName)))
 	defer func() {
 		if err := recover(); err != nil {
@@ -95,22 +103,10 @@ func DownloadLogHandler(w http.ResponseWriter, r *http.Request) {
 		}
 	}()
 	objName := logParam.MinioObjName
-	if !strings.HasPrefix(objName, "/") {
-		objName = "/" + objName
-	}
-	objName = strings.Trim(objName, "\n")
-	object, err := utils.GetMinioClient().GetObject(r.Context(), config.GlobConfig.Bucket, objName, minio.GetObjectOptions{})
-	if err == nil {
-		defer object.Close()
-		buffer := make([]byte, 2048)
-		r := bufio.NewReader(object)
-		for {
-			if n, e := r.Read(buffer); e == nil && n > 0 {
-				w.Write(buffer[:n])
-			} else {
-				return
-			}
-		}
+	resObj, err2 := utils.GetMinioClient().GetObject(context.Background(), config.GlobConfig.Bucket, objName, minio.GetObjectOptions{})
+	if err2 == nil {
+		defer resObj.Close()
+		io.Copy(w, resObj)
 	} else {
 		w.Write([]byte(err.Error()))
 	}
@@ -142,21 +138,27 @@ func UploadLogByTrackNo(w http.ResponseWriter, r *http.Request) {
 			Message:       param.Message,
 			ContainerName: param.ContainerName,
 			MinioObjName:  param.MinioObjName,
+			CallBackUrl:   param.CallBackUrl,
+			Async:         param.Async,
 		}
 		jsonString, err := json.Marshal(p)
 		if err != nil {
 			log.Printf("uploadLogByTrackNo marshal error %+v", err)
 		}
-		//wait 3 second for log cache write
-		time.Sleep(3 * time.Second)
-		if resp, err := utils.GetFileBeatClient().Post(utils.FileBeatUpload, "application/json", bytes.NewBuffer(jsonString)); err == nil {
-			var res UploadLogParam
-			if err := json.NewDecoder(resp.Body).Decode(&res); err == nil {
-				utils.SUCCESS_RES("success", res, w)
-			} else {
-				utils.FAIL_RES(err.Error(), nil, w)
+		requestError := retry.Do(func() error {
+			resp, err2 := utils.GetFileBeatClient().Post(utils.FileBeatUpload, "application/json", bytes.NewBuffer(jsonString))
+			if err2 == nil {
+				var res UploadByParamRes
+				if err2 = json.NewDecoder(resp.Body).Decode(&res); err2 == nil {
+					utils.SUCCESS_RES("success", res, w)
+				}
 			}
-		} else {
+			return err2
+		},
+			retry.Attempts(3),
+			retry.Delay(10*time.Second),
+		)
+		if requestError != nil {
 			log.Printf("request remote uploadFile fail error %+v", err)
 			utils.FAIL_RES(err.Error(), nil, w)
 			w.WriteHeader(http.StatusBadRequest)
@@ -176,14 +178,51 @@ func UploadLogByTrackNo(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		url := utils.GetURLByHost(host) + utils.API_UPLOADLOGBYTRACKNO
-		resp, err := utils.GetHttpClient(host).Post(url, "application/json", bytes.NewBuffer(jsonString))
-		if err != nil {
-			utils.FAIL_RES(err.Error(), nil, w)
-			w.WriteHeader(http.StatusBadRequest)
-			log.Printf("request uploadLogByTrackNo proxy error %+v", err)
-		} else {
-			io.Copy(w, resp.Body)
+		doProxySaveFunc := func() {
+			time.Sleep(3 * time.Second)
+			requestError := retry.Do(func() error {
+				resp, err2 := utils.GetHttpClient(host).Post(url, "application/json", bytes.NewBuffer(jsonString))
+				if err2 == nil {
+					r, _ := ioutil.ReadAll(resp.Body)
+					if param.Async == 0 {
+						io.Copy(w, bytes.NewReader(r))
+					}
+					go saveLogCallback(param.CallBackUrl, 1, r)
+				}
+				return err2
+			},
+				retry.Attempts(3),
+				retry.Delay(10*time.Second),
+			)
+			if requestError != nil {
+				var resBody []byte
+				if param.Async == 0 {
+					resBody = utils.FAIL_RES(err.Error(), nil, w)
+					w.WriteHeader(http.StatusBadRequest)
+				}
+				go saveLogCallback(param.CallBackUrl, 0, resBody)
+				log.Printf("request uploadLogByTrackNo proxy error %+v", err)
+			}
 		}
-	}
+		//async exec
+		if param.Async > 0 {
+			go doProxySaveFunc()
+			utils.SUCCESS_RES("request success", nil, w)
+		} else {
+			doProxySaveFunc()
+		}
 
+	}
+}
+
+func saveLogCallback(url string, status int, res []byte) {
+	defer func() {
+		if err := recover(); err != nil {
+			log.Printf("callback request error %+v", err)
+		}
+	}()
+	if url != "" {
+		log.Printf("do callback url:%+v,--status:%+v", url, status)
+		utils.GetRetryHttpClient().Post(url, "application/json", res)
+	}
 }

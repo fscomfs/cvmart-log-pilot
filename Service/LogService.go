@@ -14,9 +14,12 @@ import (
 	"github.com/minio/minio-go/v7"
 	"io"
 	"io/ioutil"
+	coreV1 "k8s.io/api/core/v1"
+	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"log"
 	"net/http"
 	"path/filepath"
+	"strings"
 	"time"
 )
 
@@ -40,6 +43,7 @@ type UploadByParamRes struct {
 type UploadLogParam struct {
 	Token         string `json:"token"`
 	Message       string `json:"message"`
+	PodLabel      string `json:"podLabel"`
 	ContainerName string `json:"containerName"`
 	MinioObjName  string `json:"minioObjName"`
 	CallBackUrl   string `json:"callBackUrl"`
@@ -156,11 +160,11 @@ func UploadLogByTrackNo(w http.ResponseWriter, r *http.Request) {
 			return err2
 		},
 			retry.Attempts(3),
-			retry.Delay(10*time.Second),
+			retry.Delay(20*time.Second),
 		)
 		if requestError != nil {
 			log.Printf("request remote uploadFile fail error %+v", err)
-			utils.FAIL_RES(err.Error(), nil, w)
+			utils.FAIL_RES(requestError.Error(), nil, w)
 			w.WriteHeader(http.StatusBadRequest)
 		}
 	} else {
@@ -177,39 +181,115 @@ func UploadLogByTrackNo(w http.ResponseWriter, r *http.Request) {
 			w.WriteHeader(http.StatusUnauthorized)
 			return
 		}
+		resData := &UploadByParamRes{
+			TrackFlag:  0,
+			UploadCode: 0,
+		}
 		url := utils.GetURLByHost(host) + utils.API_UPLOADLOGBYTRACKNO
-		doProxySaveFunc := func() {
-			time.Sleep(3 * time.Second)
-			requestError := retry.Do(func() error {
-				resp, err2 := utils.GetHttpClient(host).Post(url, "application/json", bytes.NewBuffer(jsonString))
-				if err2 == nil {
-					r, _ := ioutil.ReadAll(resp.Body)
-					if param.Async == 0 {
-						io.Copy(w, bytes.NewReader(r))
+		doProxySaveFunc := func(pod *coreV1.Pod) {
+			if resData.TrackFlag == 1 {
+				time.Sleep(5 * time.Second)
+				requestError := retry.Do(func() error {
+					resp, err2 := utils.GetHttpClient(host).Post(url, "application/json", bytes.NewBuffer(jsonString))
+					if err2 == nil {
+						r, _ := ioutil.ReadAll(resp.Body)
+						if param.Async == 0 {
+							io.Copy(w, bytes.NewReader(r))
+						}
+						go saveLogCallback(param.CallBackUrl, 1, r)
 					}
-					go saveLogCallback(param.CallBackUrl, 1, r)
+					return err2
+				},
+					retry.Attempts(3),
+					retry.Delay(20*time.Second),
+				)
+				if requestError != nil {
+					var resBody []byte
+					if param.Async == 0 {
+						resBody = utils.FAIL_RES(requestError.Error(), nil, w)
+						w.WriteHeader(http.StatusBadRequest)
+					} else {
+						resBody = utils.FAIL_RES(requestError.Error(), nil, nil)
+					}
+					go saveLogCallback(param.CallBackUrl, 0, resBody)
+					log.Printf("request uploadLogByTrackNo proxy error %+v", err)
 				}
-				return err2
-			},
-				retry.Attempts(3),
-				retry.Delay(10*time.Second),
-			)
-			if requestError != nil {
-				var resBody []byte
-				if param.Async == 0 {
-					resBody = utils.FAIL_RES(err.Error(), nil, w)
-					w.WriteHeader(http.StatusBadRequest)
+			} else {
+				if pod != nil {
+					tailLimes := int64(100000)
+					limitBytes := int64(100 * 1024 * 1024)
+					req := utils.GetK8sClient().CoreV1().Pods(pod.Namespace).GetLogs(pod.Name, &coreV1.PodLogOptions{
+						TailLines:  &tailLimes,
+						LimitBytes: &limitBytes,
+					})
+					errInfoMessage := ""
+					appendMessageReader := bytes.NewReader([]byte("\n" + param.Message))
+					if logReader, errLog := req.Stream(context.Background()); errLog == nil {
+						uploadInfo, uploadErr := utils.GetMinioClient().PutObject(context.Background(), config.GlobConfig.Bucket, param.MinioObjName, io.MultiReader(logReader, appendMessageReader), -1, minio.PutObjectOptions{
+							ContentType: "application/octet-stream",
+						})
+						if uploadErr != nil {
+							resData.UploadCode = 0
+							errInfoMessage = uploadErr.Error()
+							log.Printf("no track upload k8s api log error:%+v", uploadErr)
+						} else {
+							resData.UploadCode = 1
+							log.Printf("no track upload k8s api log success:%+v", uploadInfo)
+						}
+					} else {
+						if statusError, errInfo := container_log.GetPodErrorInfo(pod.Status); errInfo != nil {
+							uploadInfo, uploadErr := utils.GetMinioClient().PutObject(context.Background(), config.GlobConfig.Bucket, param.MinioObjName, io.MultiReader(bytes.NewReader([]byte(statusError)), appendMessageReader), -1, minio.PutObjectOptions{
+								ContentType: "application/octet-stream",
+							})
+							if uploadErr != nil {
+								errInfoMessage = uploadErr.Error()
+								resData.UploadCode = 0
+								log.Printf("no track upload k8s api log error:%+v", uploadErr)
+							} else {
+								resData.UploadCode = 1
+								log.Printf("no track upload k8s api log success:%+v", uploadInfo)
+							}
+						}
+					}
+					var resBody []byte
+					if resData.UploadCode == 1 {
+						resBody = utils.SUCCESS_RES("success", resData, nil)
+					} else {
+						resBody = utils.FAIL_RES(errInfoMessage, resData, nil)
+					}
+					go saveLogCallback(param.CallBackUrl, 1, resBody)
 				}
-				go saveLogCallback(param.CallBackUrl, 0, resBody)
-				log.Printf("request uploadLogByTrackNo proxy error %+v", err)
 			}
+
 		}
 		//async exec
-		if param.Async > 0 {
-			go doProxySaveFunc()
-			utils.SUCCESS_RES("request success", nil, w)
+		listOption := v1.ListOptions{
+			Watch:         false,
+			LabelSelector: "app=" + param.PodLabel,
+		}
+		podList, err := utils.GetK8sClient().CoreV1().Pods("default").List(context.Background(), listOption)
+		isTrack := 0
+		var pod *coreV1.Pod = nil
+		if err == nil && len(podList.Items) > 0 {
+			pod = &podList.Items[0]
+		loop1:
+			for _, container := range pod.Spec.Containers {
+				for _, envVar := range container.Env {
+					if strings.Contains(envVar.Name, "cvmart_logs_stdout") {
+						isTrack = 1
+						break loop1
+					}
+				}
+			}
 		} else {
-			doProxySaveFunc()
+			isTrack = 1
+		}
+		resData.TrackFlag = isTrack
+		if param.Async > 0 {
+			go doProxySaveFunc(pod)
+			utils.SUCCESS_RES("request success", resData, w)
+		} else {
+			doProxySaveFunc(pod)
 		}
 
 	}

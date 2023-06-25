@@ -67,25 +67,30 @@ func InitConfig() {
 }
 
 func SUCCESS_RES(msg string, data interface{}, w http.ResponseWriter) []byte {
-	w.Header().Set("Content-Type", "application/json")
 	res := BaseResult{
 		Code: SUCCESS_CODE,
 		Msg:  msg,
 		Data: data,
 	}
 	c, _ := json.Marshal(&res)
-	w.Write(c)
+	if w != nil {
+		w.Header().Set("Content-Type", "application/json")
+		w.Write(c)
+	}
 	return c
 }
 func FAIL_RES(msg string, data interface{}, w http.ResponseWriter) []byte {
-	w.Header().Set("Content-Type", "application/json")
+
 	res := BaseResult{
 		Code: FAIL_CODE,
 		Msg:  msg,
 		Data: data,
 	}
 	c, _ := json.Marshal(&res)
-	w.Write(c)
+	if w != nil {
+		w.Header().Set("Content-Type", "application/json")
+		w.Write(c)
+	}
 	return c
 }
 

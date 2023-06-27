@@ -138,7 +138,7 @@ func (d *DockerLog) Start(ctx context.Context, def *ConnectDef) error {
 					log.Printf("error:%+v", err)
 				}
 				def.writeMid(logStatMessage([]byte("\rWait for task create...")))
-				time.Sleep(20 * time.Second)
+				time.Sleep(10 * time.Second)
 				continue
 			}
 			pod := podList.Items[0]
@@ -146,7 +146,7 @@ func (d *DockerLog) Start(ctx context.Context, def *ConnectDef) error {
 			reason, err := GetPodErrorInfo(pod.Status)
 			if err != nil {
 				def.writeMid(logStatMessage([]byte("\rtask run fail:" + reason + "" + err.Error())))
-				time.Sleep(60 * time.Second)
+				time.Sleep(30 * time.Second)
 				continue
 			}
 			if pod.Status.Phase == "Pending" {
@@ -175,7 +175,7 @@ func (d *DockerLog) Start(ctx context.Context, def *ConnectDef) error {
 				def.writeMid(logStatMessage([]byte("task run fail:" + pod.Status.Reason + "\n")))
 				return nil
 			}
-			time.Sleep(20 * time.Second)
+			time.Sleep(10 * time.Second)
 
 		}
 	} else {
@@ -292,7 +292,15 @@ func containerResourceInfo(ctx context.Context, client *docker.Client, container
 	var (
 		previousCPU    uint64
 		previousSystem uint64
+		cpus           float64
 	)
+	if conInspect, inspectErrorInfo := client.ContainerInspect(ctx, containerID); inspectErrorInfo == nil {
+		if conInspect.HostConfig.CPUQuota > 0 && conInspect.HostConfig.CPUPeriod > 0 {
+			cpus = float64(conInspect.HostConfig.CPUQuota) / float64(conInspect.HostConfig.CPUPeriod)
+		}
+
+	}
+
 	res, err := client.ContainerStats(ctx, containerID, true)
 	if err != nil {
 		return false, err
@@ -324,7 +332,7 @@ func containerResourceInfo(ctx context.Context, client *docker.Client, container
 			if daemonOSType != "windows" {
 				previousCPU = v.PreCPUStats.CPUUsage.TotalUsage
 				previousSystem = v.PreCPUStats.SystemUsage
-				cpuPercent = calculateCPUPercentUnix(previousCPU, previousSystem, v)
+				cpuPercent = calculateCPUPercentUnix(cpus, previousCPU, previousSystem, v)
 				blkRead, blkWrite = calculateBlockIO(v.BlkioStats)
 				mem = calculateMemUsageUnixNoCache(v.MemoryStats)
 				memLimit = float64(v.MemoryStats.Limit)
@@ -357,7 +365,7 @@ func containerResourceInfo(ctx context.Context, client *docker.Client, container
 	}
 }
 
-func calculateCPUPercentUnix(previousCPU, previousSystem uint64, v *types.StatsJSON) float64 {
+func calculateCPUPercentUnix(cpus float64, previousCPU, previousSystem uint64, v *types.StatsJSON) float64 {
 	var (
 		cpuPercent = 0.0
 		// calculate the change for the cpu usage of the container in between readings
@@ -372,6 +380,9 @@ func calculateCPUPercentUnix(previousCPU, previousSystem uint64, v *types.StatsJ
 	}
 	if systemDelta > 0.0 && cpuDelta > 0.0 {
 		cpuPercent = (cpuDelta / systemDelta) * onlineCPUs * 100.0
+	}
+	if cpus > 0 {
+		cpuPercent = cpuPercent / cpus
 	}
 	return cpuPercent
 }

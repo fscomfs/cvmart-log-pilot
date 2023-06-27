@@ -135,7 +135,7 @@ func UploadLogByTrackNo(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if logParam.Host == "" {
+	if logParam.Host == "localhost" {
 		//localhost
 		p := LocalUploadLogParam{
 			TrackNo:       logParam.TrackNo,
@@ -169,7 +169,7 @@ func UploadLogByTrackNo(w http.ResponseWriter, r *http.Request) {
 		}
 	} else {
 		host := logParam.Host
-		logParam.Host = ""
+		logParam.Host = "localhost"
 		t, e := auth.GeneratorToken(*logParam)
 		param.Token = t
 		jsonString, err := json.Marshal(param)
@@ -185,8 +185,8 @@ func UploadLogByTrackNo(w http.ResponseWriter, r *http.Request) {
 			TrackFlag:  0,
 			UploadCode: 0,
 		}
-		url := utils.GetURLByHost(host) + utils.API_UPLOADLOGBYTRACKNO
 		doProxySaveFunc := func(pod *coreV1.Pod) {
+			url := utils.GetURLByHost(host) + utils.API_UPLOADLOGBYTRACKNO
 			if resData.TrackFlag == 1 {
 				time.Sleep(5 * time.Second)
 				requestError := retry.Do(func() error {
@@ -237,8 +237,8 @@ func UploadLogByTrackNo(w http.ResponseWriter, r *http.Request) {
 							log.Printf("no track upload k8s api log success:%+v", uploadInfo)
 						}
 					} else {
-						if statusError, errInfo := container_log.GetPodErrorInfo(pod.Status); errInfo != nil {
-							uploadInfo, uploadErr := utils.GetMinioClient().PutObject(context.Background(), config.GlobConfig.Bucket, param.MinioObjName, io.MultiReader(bytes.NewReader([]byte(statusError)), appendMessageReader), -1, minio.PutObjectOptions{
+						if _, errInfo := container_log.GetPodErrorInfo(pod.Status); errInfo != nil {
+							uploadInfo, uploadErr := utils.GetMinioClient().PutObject(context.Background(), config.GlobConfig.Bucket, param.MinioObjName, io.MultiReader(bytes.NewReader([]byte(errInfo.Error())), appendMessageReader), -1, minio.PutObjectOptions{
 								ContentType: "application/octet-stream",
 							})
 							if uploadErr != nil {
@@ -272,6 +272,9 @@ func UploadLogByTrackNo(w http.ResponseWriter, r *http.Request) {
 		var pod *coreV1.Pod = nil
 		if err == nil && len(podList.Items) > 0 {
 			pod = &podList.Items[0]
+			if host == "" {
+				host = pod.Status.HostIP
+			}
 		loop1:
 			for _, container := range pod.Spec.Containers {
 				for _, envVar := range container.Env {
@@ -283,6 +286,9 @@ func UploadLogByTrackNo(w http.ResponseWriter, r *http.Request) {
 			}
 		} else {
 			isTrack = 1
+		}
+		if host == "" {
+			host = "localhost"
 		}
 		resData.TrackFlag = isTrack
 		if param.Async > 0 {

@@ -103,9 +103,12 @@ func (a *AtlasInfo) InfoAll() (map[string]gpu.InfoObj, error) {
 						continue
 					}
 					coreRate, _ := dc.DcGetDeviceUtilizationRate(carIndex, deviceId, common.AICore)
+					info, _ := dc.DcGetChipInfo(carIndex, deviceId)
 					res[cast.ToString(index)] = gpu.InfoObj{
 						Total:   memoryInfo.MemorySize * uint64(1000*1000),
 						Used:    (memoryInfo.MemorySize - memoryInfo.MemoryAvailable) * uint64(1000*1000),
+						GpuType: "NPU",
+						Model:   info.Name,
 						GpuUtil: uint32(coreRate),
 						MemUtil: memoryInfo.Utilization,
 					}

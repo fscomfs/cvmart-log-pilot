@@ -117,6 +117,7 @@ func isContainer(def *ConnectDef) bool {
 func (d *DockerLog) Start(ctx context.Context, def *ConnectDef) error {
 	var containerId string
 	var dockerHost string
+	var started bool
 	if !isContainer(def) {
 		for {
 			if d.closed {
@@ -137,9 +138,15 @@ func (d *DockerLog) Start(ctx context.Context, def *ConnectDef) error {
 				if err != nil {
 					log.Printf("error:%+v", err)
 				}
+				if started {
+					def.writeMid(logStatMessage([]byte("\nLOG_END")))
+					return nil
+				}
 				def.writeMid(logStatMessage([]byte("\rWait for task create...")))
 				time.Sleep(10 * time.Second)
 				continue
+			} else {
+				started = true
 			}
 			pod := podList.Items[0]
 			count := len(pod.Status.InitContainerStatuses) + len(pod.Status.ContainerStatuses)
@@ -175,7 +182,7 @@ func (d *DockerLog) Start(ctx context.Context, def *ConnectDef) error {
 				def.writeMid(logStatMessage([]byte("task run fail:" + pod.Status.Reason + "\n")))
 				return nil
 			}
-			time.Sleep(10 * time.Second)
+			time.Sleep(5 * time.Second)
 
 		}
 	} else {

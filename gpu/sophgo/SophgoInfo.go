@@ -67,6 +67,8 @@ func (a *SophgoInfo) Info(indexs []string) (map[string]gpu.InfoObj, error) {
 				//Total:   uint64(v.MemTotal),
 				//Used:    uint64(v.MemUsed),
 				GpuUtil: uint32(v.TpuUtil),
+				GpuType: "TPU",
+				Model:   "BM1684",
 				//MemUtil: MemUtil,
 			}
 		}

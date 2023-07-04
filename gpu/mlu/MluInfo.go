@@ -57,12 +57,15 @@ func (a *MluInfo) Info(indexs []string) (map[string]gpu.InfoObj, error) {
 	for _, v := range indexs {
 		pyUsed, pyTotal, _, _, err := client.GetDeviceMemory(cast.ToUint(v))
 		avgUtil, _, err2 := client.GetDeviceUtil(cast.ToUint(v))
+		model := client.GetDeviceModel(cast.ToUint(v))
 		if err == nil && err2 == nil {
 			res[v] = gpu.InfoObj{
 				Total:   uint64(pyTotal * 1024 * 1024),
 				Used:    uint64(pyUsed * 1024 * 1024),
 				GpuUtil: uint32(avgUtil),
 				MemUtil: uint32((pyUsed / pyTotal) * 100),
+				GpuType: "MLU",
+				Model:   model,
 			}
 		}
 	}

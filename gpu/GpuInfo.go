@@ -31,6 +31,7 @@ func init() {
 type InfoObj struct {
 	Total   uint64 `json:"total"`
 	Used    uint64 `json:"used"`
+	GpuType string `json:"gpuType"`
 	Model   string `json:"model"`
 	GpuUtil uint32 `json:"gpuUtil"`
 	MemUtil uint32 `json:"memUtil"`

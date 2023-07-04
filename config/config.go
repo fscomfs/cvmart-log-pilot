@@ -44,7 +44,7 @@ func ParseFromFile(filePath string) {
 	}
 	json.Unmarshal(data, &GlobConfig)
 	if GlobConfig.LineMaxSize == 0 {
-		GlobConfig.LineMaxSize = 16 * 1024
+		GlobConfig.LineMaxSize = 4 * 1024
 	}
 }
 

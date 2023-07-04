@@ -83,10 +83,13 @@ func (n *NvidiaInfo) Info(indexs []string) (map[string]gpu.InfoObj, error) {
 			}
 		}
 		memInfo, _ := nvml.DeviceGetMemoryInfo(devH)
+		model, _ := nvml.DeviceGetName(devH)
 		util, _ := nvml.DeviceGetUtilizationRates(devH)
 		res[v] = gpu.InfoObj{
 			Total:   memInfo.Total,
 			Used:    memInfo.Used,
+			GpuType: "GPU",
+			Model:   model,
 			GpuUtil: util.Gpu,
 			MemUtil: util.Memory,
 		}

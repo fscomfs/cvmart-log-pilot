@@ -31,13 +31,14 @@ func ContainerGpuInfoHandler(w http.ResponseWriter, r *http.Request) {
 	var index []string
 	if gpuInfoExecutor != nil {
 		index = gpuInfoExecutor.ContainerDevices(containerID)
-		log.Printf("get device executor %+v", len(index))
+		log.Printf("get device size:%+v,ids:%+v", len(index), index)
 	}
 	if len(index) > 0 {
 		conn, _ := upgrader.Upgrade(w, r, nil)
 		defer conn.Close()
 		for {
 			if res, error := gpuInfoExecutor.Info(index); error != nil {
+				log.Printf("get gpu info error:%+v", error)
 				return
 			} else {
 				jsonStr, _ := json.Marshal(res)

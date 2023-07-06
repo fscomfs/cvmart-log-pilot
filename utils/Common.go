@@ -3,6 +3,7 @@ package utils
 import (
 	"bytes"
 	"context"
+	"crypto/tls"
 	"encoding/json"
 	"fmt"
 	log "github.com/Sirupsen/logrus"
@@ -270,6 +271,11 @@ func InitRetryHttpClient() {
 	retryHttpClient = retryhttp.NewClient()
 	httpClientTemp := &http.Client{
 		Timeout: 5 * time.Second,
+		Transport: &http.Transport{
+			TLSClientConfig: &tls.Config{
+				InsecureSkipVerify: true,
+			},
+		},
 	}
 	retryHttpClient.HTTPClient = httpClientTemp
 	retryHttpClient.RetryMax = 8

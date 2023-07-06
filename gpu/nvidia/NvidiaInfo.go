@@ -34,6 +34,11 @@ func (n *NvidiaInfo) ContainerDevices(containerID string) []string {
 		log.Printf("ContainerInspect containerID=%+v error %+v", containerID, err)
 		return uuids
 	}
+	defer func() {
+		if err := recover(); err != nil {
+			log.Printf("ContainerDevices error recover:%+v", err)
+		}
+	}()
 	for _, v := range container.Config.Env {
 		if strings.Contains(v, "NVIDIA_VISIBLE_DEVICE") {
 			env := strings.Split(v, "=")
@@ -56,6 +61,11 @@ func (n *NvidiaInfo) ContainerDevices(containerID string) []string {
 var GpuDeviceMap map[string]nvml.Device
 
 func (n *NvidiaInfo) Info(indexs []string) (map[string]gpu.InfoObj, error) {
+	defer func() {
+		if err := recover(); err != nil {
+			log.Printf("Info error recover:%+v", err)
+		}
+	}()
 	var res = make(map[string]gpu.InfoObj)
 	if GpuDeviceMap == nil {
 		GpuDeviceMap = make(map[string]nvml.Device)
@@ -66,11 +76,13 @@ func (n *NvidiaInfo) Info(indexs []string) (map[string]gpu.InfoObj, error) {
 			devH = GpuDeviceMap[v]
 		} else {
 			if strings.HasPrefix(v, "GPU") {
-				devH, _ = nvml.DeviceGetHandleByUUID(v)
+				devH, re := nvml.DeviceGetHandleByUUID(strings.TrimSpace(v))
 				if devH.Handle != nil {
 					GpuDeviceMap[v] = devH
 				} else {
-					return res, fmt.Errorf("get deviceHandle error")
+					nvml.Shutdown()
+					nvml.Init()
+					return res, fmt.Errorf("get deviceHandle error by uuid:%+v, return:%+v", v, re)
 				}
 			} else {
 				i, _ := strconv.ParseInt(v, 10, 8)
@@ -97,6 +109,11 @@ func (n *NvidiaInfo) Info(indexs []string) (map[string]gpu.InfoObj, error) {
 	return res, nil
 }
 func (n *NvidiaInfo) InfoAll() (map[string]gpu.InfoObj, error) {
+	defer func() {
+		if err := recover(); err != nil {
+			log.Printf("Info error recover:%+v", err)
+		}
+	}()
 	count, _ := nvml.DeviceGetCount()
 	indexs := []string{}
 	if count > 0 {

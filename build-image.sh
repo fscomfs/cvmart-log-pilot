@@ -1,5 +1,5 @@
-docker buildx build -t 192.168.1.76:8099/evtrain/cvmart-daemon-arm64:v1.0 --platform linux/arm64 -f Dockerfile.filebeat . --load
-docker build --build-arg TARGETARCH="amd64" -t 192.168.1.76:8099/evtrain/cvmart-daemon-amd64:v1.0 -f Dockerfile.filebeat .
+docker buildx build -t 192.168.1.76:8099/evtrain/cvmart-daemon-arm64:v1.0 --platform linux/arm64 --build-arg  GNU_ARCH="aarch64" -f Dockerfile.filebeat . --load
+docker build --build-arg TARGETARCH="amd64" --build-arg GNU_ARCH="x86_64" -t 192.168.1.76:8099/evtrain/cvmart-daemon-amd64:v1.0 -f Dockerfile.filebeat .
 
 docker push 192.168.1.76:8099/evtrain/cvmart-daemon-amd64:v1.0
 docker push 192.168.1.76:8099/evtrain/cvmart-daemon-arm64:v1.0

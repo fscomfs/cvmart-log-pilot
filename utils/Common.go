@@ -196,7 +196,7 @@ func GetURLByHost(host string) string {
 	return hostUrl
 }
 
-var zz = "a_><>912()*=+-bcdefg@@@hijklmn'opq;srst$uvw@!中国文字"
+var zz = "#^()abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ*<>_"
 var zzLen = len(zz)
 
 func LineConfound(line []byte, rsb bool) []byte {
@@ -213,9 +213,9 @@ func LineConfound(line []byte, rsb bool) []byte {
 	}
 	lens := len(line)
 	if lens > config.GlobConfig.LineMaxSize {
-		for i := 0; i < lens/200; i++ {
-			s := rand.Intn(zzLen)
-			is := rand.Intn(lens - 1)
+		for i := 0; i < lens/1000; i++ {
+			s := rand.Intn(zzLen - 1)
+			is := rand.Intn(lens - 2)
 			line = append(line[:is+1], append([]byte{zz[s]}, line[is+1:]...)...)
 		}
 	}

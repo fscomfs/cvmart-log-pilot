@@ -44,7 +44,7 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
-	configInit()
+	configInit(baseDir)
 	go server.Handler()
 	if config.GlobConfig.EnableProxy {
 		proxy.InitProxy()
@@ -55,11 +55,12 @@ func main() {
 
 }
 
-func configInit() {
+func configInit(baseDir string) {
 	utils.InitConfig()
 	utils.InitProxyHttpClient()
 	utils.InitMinioClient()
 	utils.InitFileBeatClient()
 	utils.InitK8sClient()
 	utils.InitRetryHttpClient()
+	utils.InitQuotaController(baseDir)
 }

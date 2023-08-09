@@ -26,5 +26,6 @@
     "token": ""
   },
   "pilot_type": "filebeat",
-  "pilot_log_prefix": "cvmart"
+  "pilot_log_prefix": "cvmart",
+  "host_temp_data_path": "/home/data/tempdisk"
 }

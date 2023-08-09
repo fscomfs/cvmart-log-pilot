@@ -10,6 +10,7 @@ import (
 	docker "github.com/docker/docker/client"
 	"github.com/docker/go-connections/sockets"
 	"github.com/fscomfs/cvmart-log-pilot/config"
+	"github.com/fscomfs/cvmart-log-pilot/quota"
 	retryhttp "github.com/hashicorp/go-retryablehttp"
 	"github.com/minio/minio-go/v7"
 	"github.com/minio/minio-go/v7/pkg/credentials"
@@ -20,6 +21,7 @@ import (
 	"net"
 	"net/http"
 	"net/url"
+	"path"
 	"regexp"
 	"strings"
 	"time"
@@ -33,6 +35,10 @@ const (
 	API_CONTAINERGPUINFO   = "/api/containerGpuInfo"
 	API_DOWNLOADLOG        = "/api/downloadLog"
 	API_UPLOADLOGBYTRACKNO = "/api/uploadLogByTrackNo"
+	API_SETQUOTA           = "/api/setDirQuota"
+	API_GETDIRQUOTAINFO    = "/api/getDirQuotaInfo"
+	API_GETNODESPACEINFO   = "/api/getNodeSpaceInfo"
+	API_RELEASEDIR         = "/api/releaseDir"
 	SUCCESS_CODE           = 200
 	FAIL_CODE              = 999
 )
@@ -56,6 +62,7 @@ var httpClient *http.Client
 var remoteProxyUrl *url.URL
 var k8sClient *kubernetes.Clientset
 var retryHttpClient *retryhttp.Client
+var quotaController *quota.Control
 
 func InitConfig() {
 	if config.GlobConfig.RemoteProxyHost != "" && config.GlobConfig.EnableProxy {
@@ -286,4 +293,19 @@ func InitRetryHttpClient() {
 
 func GetRetryHttpClient() *retryhttp.Client {
 	return retryHttpClient
+}
+func GetQuotaControl() *quota.Control {
+	return quotaController
+}
+
+func InitQuotaController(baseDir string) {
+	log.Printf("start Init quota Controller on %s", path.Join(baseDir, config.GlobConfig.HostTempDataPath))
+	var err error
+	quotaController, err = quota.NewControl(baseDir, config.GlobConfig.HostTempDataPath)
+	if err != nil {
+		log.Errorf("NewControl error = %s", err.Error())
+	} else {
+		log.Printf("Success Init quota Controller on %s", path.Join(baseDir, config.GlobConfig.HostTempDataPath))
+	}
+
 }

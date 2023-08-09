@@ -27,6 +27,7 @@ type Config struct {
 	PilotLogPrefix   string     `json:"pilot_log_prefix"`
 	LineMaxSize      int        `json:"line_max_size"`
 	ProxyPort        int        `json:"proxy_port"`
+	HostTempDataPath string     `json:"host_temp_data_path"`
 }
 
 type AuthConfig struct {

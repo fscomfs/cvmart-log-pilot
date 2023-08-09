@@ -45,6 +45,47 @@ func (a *AESAuth) Auth(token string) (r *LogParam, e error) {
 	}
 }
 
+func (a *AESAuth) AuthJWTToken(token string) (r []byte, e error) {
+	defer func() {
+		if err := recover(); err != nil {
+			r = nil
+			e = fmt.Errorf("invalin token")
+		}
+	}()
+	t, e := base64.StdEncoding.DecodeString(token)
+	if e != nil {
+		return nil, e
+	}
+	block, e := aes.NewCipher([]byte(config.GlobConfig.SecretKey))
+	if e != nil {
+		return nil, e
+	}
+	iv := t[:block.BlockSize()]
+	cipherText := t[block.BlockSize():]
+	model := cipher.NewCBCDecrypter(block, iv)
+	plainText := make([]byte, len(cipherText))
+	model.CryptBlocks(plainText, cipherText)
+	plainText, err := UnPaddingPKCS7(plainText)
+	if err != nil {
+		return nil, err
+	}
+	return plainText, nil
+}
+func (a *AESAuth) GeneratorJWTToken(param []byte) (string, error) {
+	block, _ := aes.NewCipher([]byte(config.GlobConfig.SecretKey))
+	iv := make([]byte, block.BlockSize())
+	if _, e := io.ReadFull(rand.Reader, iv); e != nil {
+
+	}
+	model := cipher.NewCBCEncrypter(block, iv)
+	param = PaddingPKCS7(param, block.BlockSize())
+	chiperText := make([]byte, len(param))
+	model.CryptBlocks(chiperText, param)
+	entrypted := append(iv, chiperText...)
+	encroded := base64.StdEncoding.EncodeToString(entrypted)
+	return encroded, nil
+}
+
 func (a *AESAuth) GeneratorToken(logParam LogParam) (string, error) {
 	paramJson, err := json.Marshal(logParam)
 	if err == nil {

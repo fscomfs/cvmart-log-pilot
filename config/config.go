@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"log"
+	"strings"
 )
 
 var GlobConfig Config
@@ -46,6 +47,9 @@ func ParseFromFile(filePath string) {
 	json.Unmarshal(data, &GlobConfig)
 	if GlobConfig.LineMaxSize == 0 {
 		GlobConfig.LineMaxSize = 4 * 1024
+	}
+	if GlobConfig.HostTempDataPath != "" {
+		GlobConfig.HostTempDataPath = strings.TrimSuffix(GlobConfig.HostTempDataPath, "/")
 	}
 }
 

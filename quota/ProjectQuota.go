@@ -44,6 +44,7 @@ import (
 	"fmt"
 	log "github.com/Sirupsen/logrus"
 	"github.com/pkg/errors"
+	"github.com/shirou/gopsutil/disk"
 	"golang.org/x/sys/unix"
 	"io/ioutil"
 	"os"
@@ -375,6 +376,7 @@ func setProjectQuota(backingFsBlockDev string, projectID uint32, quota Quota) er
 
 	return nil
 }
+
 func getPquotaState() *pquotaState {
 	pquotaStateOnce.Do(func() {
 		pquotaStateInst = &pquotaState{
@@ -387,16 +389,41 @@ func getPquotaState() *pquotaState {
 func NewControl(prefixPath string, basePath string) (*Control, error) {
 	relBasePath, err := FindRealPath(prefixPath, basePath)
 	if err != nil {
-		if os.IsNotExist(err) && relBasePath != "" {
-			log.Printf("FindRealPath=%s", relBasePath)
-			if err = os.MkdirAll(relBasePath, 0777); err != nil {
-				return nil, err
+		if os.IsNotExist(err) {
+			e := os.MkdirAll(path.Join("/", prefixPath, filepath.Dir(basePath)), 0777)
+			if e == nil {
+				part, e := GetXFSMount(prefixPath)
+				if e == nil && part.Mountpoint != "" {
+					disk_path := path.Join(part.Mountpoint, "cloud-disk")
+					if _, e := os.Stat(disk_path); e != nil {
+						os.MkdirAll(disk_path, 0777)
+					}
+					if prefixPath == "" {
+						log.Printf("create symlink %s to %s", disk_path, basePath)
+						if e := os.Symlink(disk_path, basePath); e != nil {
+							return nil, e
+						}
+					} else {
+						log.Printf("create symlink %s to %s", strings.TrimPrefix(path.Join("/", prefixPath), disk_path), basePath)
+						if e := os.Symlink(strings.TrimPrefix(path.Join("/", prefixPath), disk_path), basePath); e != nil {
+							return nil, e
+						}
+					}
+					relBasePath, err = FindRealPath(prefixPath, basePath)
+					if err != nil {
+						return nil, err
+					}
+				} else {
+					return nil, e
+				}
+			} else {
+				return nil, e
 			}
-			log.Printf("New Control make dir %s", relBasePath)
 		} else {
 			return nil, err
 		}
 	}
+
 	log.Printf("real path = %s", relBasePath)
 	//
 	// create backing filesystem device node
@@ -481,27 +508,64 @@ func FindRealPath(prefixPath string, spath string) (relPath string, err error) {
 	paths := strings.FieldsFunc(spath, func(c rune) bool {
 		return c == '/'
 	})
-	for i := len(paths); i > 0; i-- {
-		t2 := path.Join(append([]string{"/", prefixPath}, paths[:i]...)...)
-		if fileInfo, err2 := os.Lstat(t2); err2 == nil {
+	currentDir := path.Join("/", prefixPath)
+	for i := 0; i < len(paths); i++ {
+		currentDir = path.Join(currentDir, paths[i])
+		if fileInfo, err2 := os.Lstat(currentDir); err2 == nil {
 			if fileInfo.Mode()&os.ModeSymlink != 0 {
-				if relPath, err2 := os.Readlink(t2); err2 != nil {
+				if relPath, err2 := os.Readlink(currentDir); err2 != nil {
 					return "", err2
 				} else {
-					rel := path.Join(append([]string{path.Join("/", prefixPath, relPath)}, paths[i:]...)...)
-					if _, err2 := os.Stat(rel); err2 != nil && os.IsNotExist(err2) {
-						return rel, err2
+					rel := path.Join("/", prefixPath, relPath)
+					if _, err2 := os.Stat(rel); err2 == nil {
+						currentDir = rel
 					} else {
-						return rel, nil
+						return rel, err2
 					}
 				}
-				break
 			} else {
-				return t2, nil
+				if i == len(paths) {
+					return currentDir, nil
+				}
 			}
 		} else {
-			continue
+			return "", err2
 		}
 	}
-	return "", fmt.Errorf("%s is not found", spath)
+	return currentDir, nil
+}
+
+func GetXFSMount(prefixPath string) (maxPart MaxSpacePartition, err error) {
+	parts, e := disk.Partitions(true)
+	if e != nil {
+		return maxPart, e
+	}
+	var currentSize uint64 = 0
+	xfsParts := []disk.PartitionStat{}
+	for _, part := range parts {
+		if part.Fstype == "xfs" {
+			xfsParts = append(xfsParts, part)
+			usag, e := disk.Usage(part.Mountpoint)
+			if e != nil {
+				continue
+			}
+			if usag.Total > currentSize {
+				maxPart = MaxSpacePartition{
+					Device:     part.Device,
+					Opts:       part.Opts,
+					Mountpoint: part.Mountpoint,
+					Total:      usag.Total,
+				}
+			}
+		}
+	}
+	return maxPart, nil
+}
+
+type MaxSpacePartition struct {
+	Device     string `json:"device"`
+	Mountpoint string `json:"mountpoint"`
+	Fstype     string `json:"fstype"`
+	Opts       string `json:"opts"`
+	Total      uint64
 }

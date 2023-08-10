@@ -86,7 +86,7 @@ func TestReleaseDir(t *testing.T) {
 }
 
 func TestGetRealPath(t *testing.T) {
-	linkPath := "/testQuotaR/testQuota/test-1" // 替换为你的软链接路径
+	linkPath := "/linktest/link1/link2/dir2"
 
 	rel, err := FindRealPath("", linkPath)
 	if err != nil {
@@ -94,5 +94,11 @@ func TestGetRealPath(t *testing.T) {
 	} else {
 		log.Printf(rel)
 	}
+}
 
+func TestGetMountInfo(t *testing.T) {
+	s, e := GetXFSMount("")
+	if e == nil {
+		log.Printf("mount info %+v", s)
+	}
 }

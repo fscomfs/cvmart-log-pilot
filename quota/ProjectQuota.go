@@ -170,6 +170,9 @@ func (q *Control) ReleaseDir(targetPath string) error {
 	if !ok {
 		return errors.Errorf("quota not found for path: %s", targetPath)
 	}
+	if filepath.Dir(targetPath) != q.basePath {
+		return errors.Errorf("can not release path: %s", targetPath)
+	}
 	return os.RemoveAll(q.getRealPath(targetPath))
 }
 
@@ -394,9 +397,12 @@ func NewControl(prefixPath string, basePath string) (*Control, error) {
 			if e == nil {
 				part, e := GetXFSMount(prefixPath)
 				if e == nil && part.Mountpoint != "" {
+					log.Printf("xfs disk mount pointer %+v", part)
 					disk_path := path.Join(part.Mountpoint, "cloud-disk")
 					if _, e := os.Stat(disk_path); e != nil {
-						os.MkdirAll(disk_path, 0777)
+						if e := os.MkdirAll(disk_path, 0777); e != nil {
+							log.Errorf("make dir err %s", err.Error())
+						}
 					}
 					if prefixPath == "" {
 						log.Printf("create symlink %s to %s", disk_path, basePath)
@@ -404,8 +410,8 @@ func NewControl(prefixPath string, basePath string) (*Control, error) {
 							return nil, e
 						}
 					} else {
-						log.Printf("create symlink %s to %s", strings.TrimPrefix(path.Join("/", prefixPath), disk_path), basePath)
-						if e := os.Symlink(strings.TrimPrefix(path.Join("/", prefixPath), disk_path), basePath); e != nil {
+						log.Printf("create symlink %s to %s", strings.TrimPrefix(disk_path, path.Join("/", prefixPath)), path.Join("/", prefixPath, basePath))
+						if e := os.Symlink(strings.TrimPrefix(disk_path, path.Join("/", prefixPath)), path.Join("/", prefixPath, basePath)); e != nil {
 							return nil, e
 						}
 					}
@@ -540,23 +546,48 @@ func GetXFSMount(prefixPath string) (maxPart MaxSpacePartition, err error) {
 	if e != nil {
 		return maxPart, e
 	}
-	var currentSize uint64 = 0
-	xfsParts := []disk.PartitionStat{}
+	xfsParts := []MaxSpacePartition{}
 	for _, part := range parts {
 		if part.Fstype == "xfs" {
-			xfsParts = append(xfsParts, part)
+			if prefixPath != "" {
+				if !strings.HasPrefix(part.Mountpoint, path.Join("/", prefixPath)) {
+					continue
+				}
+				if fi, e := os.Stat(part.Mountpoint); e == nil {
+					if !fi.IsDir() {
+						continue
+					}
+				}
+			}
 			usag, e := disk.Usage(part.Mountpoint)
 			if e != nil {
 				continue
 			}
-			if usag.Total > currentSize {
-				maxPart = MaxSpacePartition{
-					Device:     part.Device,
-					Opts:       part.Opts,
-					Mountpoint: part.Mountpoint,
-					Total:      usag.Total,
-				}
+			p := MaxSpacePartition{
+				Device:     part.Device,
+				Opts:       part.Opts,
+				Fstype:     part.Fstype,
+				Mountpoint: part.Mountpoint,
+				Total:      usag.Total,
+				DirLength:  len(strings.Split(part.Mountpoint, "/")),
 			}
+			xfsParts = append(xfsParts, p)
+		}
+	}
+	maxPart = MaxSpacePartition{
+		DirLength: 100,
+	}
+	log.Printf("all device %+v", xfsParts)
+	for i, _ := range xfsParts {
+		if xfsParts[i].Total >= maxPart.Total && xfsParts[i].Total > 0 {
+			if xfsParts[i].Device == maxPart.Device {
+				if maxPart.DirLength > xfsParts[i].DirLength {
+					maxPart = xfsParts[i]
+				}
+			} else {
+				maxPart = xfsParts[i]
+			}
+
 		}
 	}
 	return maxPart, nil
@@ -567,5 +598,6 @@ type MaxSpacePartition struct {
 	Mountpoint string `json:"mountpoint"`
 	Fstype     string `json:"fstype"`
 	Opts       string `json:"opts"`
-	Total      uint64
+	Total      uint64 `json:"total"`
+	DirLength  int    `json:"dir_length"`
 }

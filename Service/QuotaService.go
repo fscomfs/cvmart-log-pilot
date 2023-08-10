@@ -54,7 +54,12 @@ func GetNodeSpaceInfo(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if hostParam.Host == "localhost" {
-		if quotaInfo, err := utils.GetQuotaControl().GetNodeSpaceInfo(param.TargetPath); err == nil {
+		quotaControl, err := utils.GetQuotaControl()
+		if err != nil {
+			utils.FAIL_RES(err.Error(), param, w)
+			return
+		}
+		if quotaInfo, err := quotaControl.GetNodeSpaceInfo(param.TargetPath); err == nil {
 			utils.SUCCESS_RES("success", quotaInfo, w)
 		} else {
 			utils.FAIL_RES("fail", nil, w)
@@ -121,7 +126,12 @@ func ReleaseDir(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if hostParam.Host == "localhost" {
-		if err := utils.GetQuotaControl().ReleaseDir(param.TargetPath); err == nil {
+		quotaControl, err := utils.GetQuotaControl()
+		if err != nil {
+			utils.FAIL_RES(err.Error(), param, w)
+			return
+		}
+		if err := quotaControl.ReleaseDir(param.TargetPath); err == nil {
 			utils.SUCCESS_RES("success", param, w)
 		} else {
 			utils.FAIL_RES(err.Error(), nil, w)
@@ -199,7 +209,12 @@ func SetDirQuotaHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if hostParam.Host == "localhost" {
-		if err := utils.GetQuotaControl().SetDirQuota(param.TargetPath, quota.Quota{Size: param.Quota}); err == nil {
+		quotaControl, err := utils.GetQuotaControl()
+		if err != nil {
+			utils.FAIL_RES(err.Error(), param, w)
+			return
+		}
+		if err := quotaControl.SetDirQuota(param.TargetPath, quota.Quota{Size: param.Quota}); err == nil {
 			utils.SUCCESS_RES("success", param, w)
 		} else {
 			utils.FAIL_RES("fail", param, w)
@@ -267,7 +282,12 @@ func GetDirQuotaInfoHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if hostParam.Host == "localhost" {
-		if quotaInfo, err := utils.GetQuotaControl().GetDirQuota(param.TargetPath); err == nil {
+		quotaControl, err := utils.GetQuotaControl()
+		if err != nil {
+			utils.FAIL_RES(err.Error(), param, w)
+			return
+		}
+		if quotaInfo, err := quotaControl.GetDirQuota(param.TargetPath); err == nil {
 			utils.SUCCESS_RES("success", quotaInfo, w)
 		} else {
 			utils.FAIL_RES("fail", nil, w)

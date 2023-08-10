@@ -294,8 +294,11 @@ func InitRetryHttpClient() {
 func GetRetryHttpClient() *retryhttp.Client {
 	return retryHttpClient
 }
-func GetQuotaControl() *quota.Control {
-	return quotaController
+func GetQuotaControl() (*quota.Control, error) {
+	if quotaController == nil {
+		return nil, fmt.Errorf("Quota not support")
+	}
+	return quotaController, nil
 }
 
 func InitQuotaController(baseDir string) {

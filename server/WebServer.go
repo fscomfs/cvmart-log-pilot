@@ -15,8 +15,9 @@ func Handler() {
 	http.HandleFunc(utils.API_DOWNLOADLOG, Service.DownloadLogHandler)
 	http.HandleFunc(utils.API_UPLOADLOGBYTRACKNO, Service.UploadLogByTrackNo)
 	http.HandleFunc(utils.API_SETQUOTA, Service.SetDirQuotaHandler)
-	http.HandleFunc(utils.API_GETNODESPACEINFO, Service.GetNodeSpaceInfo)
+	http.HandleFunc(utils.API_GETNODESPACEINFO, Service.GetNodeSpaceInfoHandler)
 	http.HandleFunc(utils.API_GETDIRQUOTAINFO, Service.GetDirQuotaInfoHandler)
-	http.HandleFunc(utils.API_RELEASEDIR, Service.ReleaseDir)
+	http.HandleFunc(utils.API_RELEASEDIR, Service.ReleaseDirHandler)
+	http.HandleFunc(utils.API_GETIMAGEQUOTAINFO, Service.GetImageDiskQuotaInfoHandler)
 	http.ListenAndServe(fmt.Sprintf(":%d", config.GlobConfig.ServerPort), nil)
 }

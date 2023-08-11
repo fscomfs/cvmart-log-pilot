@@ -63,4 +63,5 @@ func configInit(baseDir string) {
 	utils.InitK8sClient()
 	utils.InitRetryHttpClient()
 	utils.InitQuotaController(baseDir)
+	utils.InitEnvDockerClient()
 }

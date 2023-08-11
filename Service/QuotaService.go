@@ -16,6 +16,7 @@ import (
 type QuotaParam struct {
 	AuthParam   AuthParam `json:"authParam"`
 	Token       string    `json:"token"`
+	ImageName   string    `json:"imageName"`
 	TargetPath  string    `json:"targetPath"`
 	Quota       uint64    `json:"quota"`
 	CallBackUrl string    `json:"callBackUrl"`
@@ -34,11 +35,89 @@ func (p *AuthParam) isExpiration() bool {
 	return true
 }
 
-func GetNodeSpaceInfo(w http.ResponseWriter, r *http.Request) {
+func GetImageDiskQuotaInfoHandler(w http.ResponseWriter, r *http.Request) {
 	param := QuotaParam{}
 	err := json.NewDecoder(r.Body).Decode(&param)
 	if err != nil {
-		log.Printf("Set Dir quota param fail %+v", err)
+		log.Printf("Get Image Quota Info param fail %+v", err)
+	}
+	res, err := auth.AuthJWTToken(param.Token)
+	if err != nil {
+		w.WriteHeader(http.StatusUnauthorized)
+		w.Write([]byte(err.Error()))
+		return
+	}
+	hostParam := &AuthParam{}
+	e := json.Unmarshal(res, hostParam)
+	if e != nil {
+		w.WriteHeader(http.StatusUnauthorized)
+		w.Write([]byte(e.Error()))
+		return
+	}
+	if hostParam.Host == "localhost" {
+		quotaControl, err := utils.GetQuotaControl()
+		if err != nil {
+			utils.FAIL_RES(err.Error(), param, w)
+			return
+		}
+		c := utils.GetLocalDockerClient()
+		if c == nil {
+			utils.FAIL_RES("client not init", param, w)
+			return
+		}
+		if quotaInfo, err := quotaControl.GetImageDiskQuotaInfo(param.ImageName, c); err == nil {
+			utils.SUCCESS_RES("success", quotaInfo, w)
+		} else {
+			utils.FAIL_RES(err.Error(), nil, w)
+		}
+	} else {
+		host := param.AuthParam.Host
+		param.AuthParam = AuthParam{
+			Host:           "localhost",
+			ExpirationTime: time.Now().UnixMilli() + 1000*2,
+		}
+		j, _ := json.Marshal(param.AuthParam)
+		t, e := auth.GeneratorJWTToken(j)
+		param.Token = t
+		jsonString, err := json.Marshal(param)
+		if err != nil {
+			log.Printf("Get Image Quota Info  marshal error %+v", err)
+		}
+		if e != nil {
+			w.WriteHeader(http.StatusUnauthorized)
+			utils.FAIL_RES(err.Error(), nil, w)
+			return
+		}
+		url := utils.GetURLByHost(host) + utils.API_GETIMAGEQUOTAINFO
+		requestError := retry.Do(func() error {
+			resp, err2 := utils.GetHttpClient(host).Post(url, "application/json", bytes.NewBuffer(jsonString))
+			if err2 == nil {
+				r, _ := ioutil.ReadAll(resp.Body)
+				if param.Async == 0 {
+					io.Copy(w, bytes.NewReader(r))
+				}
+				go callback(param.CallBackUrl, 1, r)
+			}
+			return err2
+		},
+			retry.Attempts(3),
+			retry.Delay(20*time.Second),
+		)
+		if requestError != nil {
+			var resBody []byte
+			w.WriteHeader(http.StatusBadRequest)
+			resBody = utils.FAIL_RES(requestError.Error(), nil, w)
+			go callback(param.CallBackUrl, 0, resBody)
+			log.Printf("request GetImageDiskQuotaInfoHandler proxy error %+v", err)
+		}
+	}
+}
+
+func GetNodeSpaceInfoHandler(w http.ResponseWriter, r *http.Request) {
+	param := QuotaParam{}
+	err := json.NewDecoder(r.Body).Decode(&param)
+	if err != nil {
+		log.Printf("get Node Space Info quota param fail %+v", err)
 	}
 	res, err := auth.AuthJWTToken(param.Token)
 	if err != nil {
@@ -62,7 +141,7 @@ func GetNodeSpaceInfo(w http.ResponseWriter, r *http.Request) {
 		if quotaInfo, err := quotaControl.GetNodeSpaceInfo(param.TargetPath); err == nil {
 			utils.SUCCESS_RES("success", quotaInfo, w)
 		} else {
-			utils.FAIL_RES("fail", nil, w)
+			utils.FAIL_RES(err.Error(), nil, w)
 		}
 	} else {
 		host := param.AuthParam.Host
@@ -106,7 +185,7 @@ func GetNodeSpaceInfo(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func ReleaseDir(w http.ResponseWriter, r *http.Request) {
+func ReleaseDirHandler(w http.ResponseWriter, r *http.Request) {
 	param := QuotaParam{}
 	err := json.NewDecoder(r.Body).Decode(&param)
 	if err != nil {
@@ -197,6 +276,7 @@ func SetDirQuotaHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	res, err := auth.AuthJWTToken(param.Token)
 	if err != nil {
+		log.Printf("Set Dir quota auth  fail %+v", err)
 		w.Write([]byte(err.Error()))
 		w.WriteHeader(http.StatusUnauthorized)
 		return
@@ -204,6 +284,7 @@ func SetDirQuotaHandler(w http.ResponseWriter, r *http.Request) {
 	hostParam := &AuthParam{}
 	e := json.Unmarshal(res, hostParam)
 	if e != nil {
+		log.Printf("Set Dir quota auth  fail %+v", err)
 		w.Write([]byte(e.Error()))
 		w.WriteHeader(http.StatusUnauthorized)
 		return
@@ -217,7 +298,8 @@ func SetDirQuotaHandler(w http.ResponseWriter, r *http.Request) {
 		if err := quotaControl.SetDirQuota(param.TargetPath, quota.Quota{Size: param.Quota}); err == nil {
 			utils.SUCCESS_RES("success", param, w)
 		} else {
-			utils.FAIL_RES("fail", param, w)
+			log.Printf("Set Dir quota error %+v", err)
+			utils.FAIL_RES(err.Error(), param, w)
 		}
 	} else {
 		host := param.AuthParam.Host
@@ -229,7 +311,7 @@ func SetDirQuotaHandler(w http.ResponseWriter, r *http.Request) {
 		param.Token = t
 		jsonString, err := json.Marshal(param)
 		if err != nil {
-			log.Printf("uploadLogByTrackNo marshal error %+v", err)
+			log.Printf("Set quota marshal error %+v", err)
 		}
 		if e != nil {
 			utils.FAIL_RES(err.Error(), nil, w)
@@ -290,7 +372,7 @@ func GetDirQuotaInfoHandler(w http.ResponseWriter, r *http.Request) {
 		if quotaInfo, err := quotaControl.GetDirQuota(param.TargetPath); err == nil {
 			utils.SUCCESS_RES("success", quotaInfo, w)
 		} else {
-			utils.FAIL_RES("fail", nil, w)
+			utils.FAIL_RES(err.Error(), nil, w)
 		}
 	} else {
 		host := param.AuthParam.Host
@@ -303,7 +385,7 @@ func GetDirQuotaInfoHandler(w http.ResponseWriter, r *http.Request) {
 		param.Token = t
 		jsonString, err := json.Marshal(param)
 		if err != nil {
-			log.Printf("uploadLogByTrackNo marshal error %+v", err)
+			log.Printf("Get dir quota Info marshal error %+v", err)
 		}
 		if e != nil {
 			w.WriteHeader(http.StatusUnauthorized)

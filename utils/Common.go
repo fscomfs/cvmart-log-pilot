@@ -39,6 +39,7 @@ const (
 	API_GETDIRQUOTAINFO    = "/api/getDirQuotaInfo"
 	API_GETNODESPACEINFO   = "/api/getNodeSpaceInfo"
 	API_RELEASEDIR         = "/api/releaseDir"
+	API_GETIMAGEQUOTAINFO  = "/api/getImageQuotaInfo"
 	SUCCESS_CODE           = 200
 	FAIL_CODE              = 999
 )
@@ -63,6 +64,7 @@ var remoteProxyUrl *url.URL
 var k8sClient *kubernetes.Clientset
 var retryHttpClient *retryhttp.Client
 var quotaController *quota.Control
+var localDockerClient *docker.Client
 
 func InitConfig() {
 	if config.GlobConfig.RemoteProxyHost != "" && config.GlobConfig.EnableProxy {
@@ -311,4 +313,17 @@ func InitQuotaController(baseDir string) {
 		log.Printf("Success Init quota Controller on %s", path.Join(baseDir, config.GlobConfig.HostTempDataPath))
 	}
 
+}
+
+func GetLocalDockerClient() *docker.Client {
+	return localDockerClient
+}
+
+func InitEnvDockerClient() {
+	client, err := docker.NewEnvClient()
+	if err != nil {
+		log.Printf("new Env DockerClient %+v", err)
+	} else {
+		localDockerClient = client
+	}
 }

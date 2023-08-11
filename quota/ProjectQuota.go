@@ -41,8 +41,11 @@ const int Q_XGETQSTAT_PRJQUOTA = QCMD(Q_XGETQSTAT, PRJQUOTA);
 */
 import "C"
 import (
+	"context"
 	"fmt"
 	log "github.com/Sirupsen/logrus"
+	"github.com/docker/docker/api/types"
+	docker "github.com/docker/docker/client"
 	"github.com/pkg/errors"
 	"github.com/shirou/gopsutil/disk"
 	"golang.org/x/sys/unix"
@@ -185,6 +188,57 @@ func (q *Control) GetNodeSpaceInfo(targetPath string) (quotaInfo QuotaInfo, err 
 		return quotaInfo, fmt.Errorf("Error getting filesystem stats:%s", err.Error())
 	}
 
+	available := stat.Bavail * uint64(stat.Bsize)
+	total := stat.Blocks * uint64(stat.Bsize)
+	quotaInfo.Quota = total
+	quotaInfo.UsedSpace = total - available
+	return quotaInfo, nil
+}
+
+func (q *Control) GetImageDiskQuotaInfo(imageName string, dockerClient *docker.Client) (quotaInfo QuotaInfo, err error) {
+	log.Printf("GetImageDiskQuotaInfo imageName=%s", imageName)
+	var stat syscall.Statfs_t
+	quotaInfo = QuotaInfo{Path: ""}
+	var imageID string
+	images, err := dockerClient.ImageList(context.Background(), types.ImageListOptions{})
+	if err == nil {
+		for _, image := range images {
+			for _, tag := range image.RepoTags {
+				if tag == imageName {
+					imageID = image.ID
+					break
+				}
+			}
+			if imageID != "" {
+				break
+			}
+		}
+	}
+
+	if imageID == "" {
+		return quotaInfo, fmt.Errorf("image not fount")
+	}
+	var targetPath string
+	imgInspcet, _, err := dockerClient.ImageInspectWithRaw(context.Background(), imageID)
+	if err == nil {
+		for key, val := range imgInspcet.GraphDriver.Data {
+			if key == "UpperDir" {
+				targetPath = val
+			}
+		}
+	}
+	if targetPath == "" {
+		return quotaInfo, fmt.Errorf("targetPath not fount")
+	}
+	relPath, e := FindRealPath(q.prefixPath, targetPath)
+	if e != nil {
+		return quotaInfo, e
+	}
+	quotaInfo.Path = relPath
+	err = syscall.Statfs(quotaInfo.Path, &stat)
+	if err != nil {
+		return quotaInfo, fmt.Errorf("Error getting filesystem stats:%s", err.Error())
+	}
 	available := stat.Bavail * uint64(stat.Bsize)
 	total := stat.Blocks * uint64(stat.Bsize)
 	quotaInfo.Quota = total

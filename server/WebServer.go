@@ -9,6 +9,7 @@ import (
 )
 
 func Handler() {
+	http.NewServeMux()
 	http.HandleFunc(utils.API_LOG, Service.LogHandler)
 	http.HandleFunc(utils.API_CHECK_GPU, Service.CheckGpuHandler)
 	http.HandleFunc(utils.API_CONTAINERGPUINFO, Service.ContainerGpuInfoHandler)
@@ -19,5 +20,7 @@ func Handler() {
 	http.HandleFunc(utils.API_GETDIRQUOTAINFO, Service.GetDirQuotaInfoHandler)
 	http.HandleFunc(utils.API_RELEASEDIR, Service.ReleaseDirHandler)
 	http.HandleFunc(utils.API_GETIMAGEQUOTAINFO, Service.GetImageDiskQuotaInfoHandler)
+	http.HandleFunc(utils.API_FILES, Service.PodFilesHandler)
+	http.HandleFunc(utils.API_FILE, Service.PodFileHandler)
 	http.ListenAndServe(fmt.Sprintf(":%d", config.GlobConfig.ServerPort), nil)
 }

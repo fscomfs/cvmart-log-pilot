@@ -10,6 +10,7 @@ import (
 	docker "github.com/docker/docker/client"
 	"github.com/docker/go-connections/sockets"
 	"github.com/fscomfs/cvmart-log-pilot/config"
+	"github.com/fscomfs/cvmart-log-pilot/pod_file"
 	"github.com/fscomfs/cvmart-log-pilot/quota"
 	retryhttp "github.com/hashicorp/go-retryablehttp"
 	"github.com/minio/minio-go/v7"
@@ -29,6 +30,7 @@ import (
 
 const (
 	DefaultFileBeatHost    = "/run/filebeat_minio.sock"
+	ENV_HOST_IP            = "ENV_HOST_IP"
 	FileBeatUpload         = "http://localhost/uploadFile"
 	API_LOG                = "/api/log"
 	API_CHECK_GPU          = "/api/checkGpu"
@@ -40,6 +42,8 @@ const (
 	API_GETNODESPACEINFO   = "/api/getNodeSpaceInfo"
 	API_RELEASEDIR         = "/api/releaseDir"
 	API_GETIMAGEQUOTAINFO  = "/api/getImageQuotaInfo"
+	API_FILES              = "/api/listFiles"
+	API_FILE               = "/api/file/"
 	SUCCESS_CODE           = 200
 	FAIL_CODE              = 999
 )
@@ -65,6 +69,7 @@ var k8sClient *kubernetes.Clientset
 var retryHttpClient *retryhttp.Client
 var quotaController *quota.Control
 var localDockerClient *docker.Client
+var podFileExporter *pod_file.PodFileExporter
 
 func InitConfig() {
 	if config.GlobConfig.RemoteProxyHost != "" && config.GlobConfig.EnableProxy {
@@ -326,4 +331,14 @@ func InitEnvDockerClient() {
 	} else {
 		localDockerClient = client
 	}
+}
+
+func InitPodFileExporter(baseDir string) {
+	podFileExporter = &pod_file.PodFileExporter{
+		BaseDir: baseDir,
+	}
+}
+
+func GetPodFileExporter() *pod_file.PodFileExporter {
+	return podFileExporter
 }

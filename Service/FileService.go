@@ -8,6 +8,7 @@ import (
 	"io"
 	"log"
 	"net/http"
+	url2 "net/url"
 	"strings"
 	"time"
 )
@@ -26,6 +27,17 @@ type FilesReq struct {
 	ContainerPath string `json:"containerPath"`
 }
 
+var podFileExporter *pod_file.PodFileExporter
+
+func InitPodFileExporter(baseDir string) {
+	podFileExporter = &pod_file.PodFileExporter{
+		BaseDir: baseDir,
+	}
+}
+
+func GetPodFileExporter() *pod_file.PodFileExporter {
+	return podFileExporter
+}
 func PodFilesHandler(w http.ResponseWriter, r *http.Request) {
 	param := FilesReq{}
 	err := json.NewDecoder(r.Body).Decode(&param)
@@ -46,7 +58,14 @@ func PodFilesHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if hostParam.Host == "localhost" {
-		utils.GetPodFileExporter().GetPodFiles(r.Context(), param.PodName, param.ContainerId, param.ImageName, param.ContainerPath, param.HostPath, w)
+		files, err := GetPodFileExporter().GetPodFiles(r.Context(), param.PodName, param.ContainerId, param.ImageName, param.ContainerPath, param.HostPath)
+		if err != nil {
+			utils.FAIL_RES(err.Error(), nil, w)
+			return
+		} else {
+			utils.SUCCESS_RES("", files, w)
+			return
+		}
 	} else {
 		host := hostParam.Host
 		hostParam := AuthParam{
@@ -86,41 +105,46 @@ func PodFilesHandler(w http.ResponseWriter, r *http.Request) {
 
 func PodFileHandler(w http.ResponseWriter, r *http.Request) {
 	path := r.URL.Path
-	paths := strings.Split(path, "/")
-	if len(paths) > 4 {
-		paramStr := paths[len(paths)-2]
-		p := &pod_file.FileURLParam{}
-		err := json.Unmarshal([]byte(paramStr), p)
+	fileName := path[strings.LastIndex(path, "/")+1:]
+	token := strings.TrimPrefix(path[:strings.LastIndex(path, "/")], utils.API_FILE)
+	p := &pod_file.FileURLParam{}
+	res, err := auth.AuthJWTToken(token)
+	err = json.Unmarshal(res, p)
+	if err != nil {
+		http.Error(w, "", http.StatusNotFound)
+		return
+	}
+	if p.Host == "localhost" {
+		GetPodFileExporter().GetPodFile(p.Path, w, r)
+	} else {
+		host := p.Host
+		p.Host = "localhost"
+		j, _ := json.Marshal(p)
+		t, _ := auth.GeneratorJWTToken(j)
+		log.Printf("pod file param={}", string(j))
+		url := utils.GetURLByHost(host) + utils.API_FILE + url2.QueryEscape(t) + "/" + url2.QueryEscape(fileName)
+		req, err := http.NewRequest(r.Method, url, r.Body)
 		if err != nil {
 			http.Error(w, "", http.StatusNotFound)
 			return
 		}
-		if p.Host == "localhost" {
-			utils.GetPodFileExporter().GetPodFile(p.Path, w, r)
-		} else {
-			host := p.Host
-			p.Host = "localhost"
-			j, _ := json.Marshal(p)
-			t, _ := auth.GeneratorJWTToken(j)
-			url := utils.GetURLByHost(host) + utils.API_FILE + t + paths[len(paths)-1]
-			req, err := http.NewRequest(r.Method, url, r.Body)
-			if err != nil {
-				http.Error(w, "", http.StatusNotFound)
-				return
-			}
-			for key, values := range r.Header {
-				for _, value := range values {
-					req.Header.Add(key, value)
-				}
-			}
-			resp, err := utils.GetHttpClient(host).Do(req)
-			if err == nil {
-				io.Copy(w, resp.Body)
-			} else {
-				http.Error(w, "", http.StatusNotFound)
-				return
+		for key, values := range r.Header {
+			for _, value := range values {
+				req.Header.Add(key, value)
 			}
 		}
-
+		resp, err := utils.GetHttpClient(host).Do(req)
+		if err == nil {
+			for key, values := range resp.Header {
+				for _, value := range values {
+					w.Header().Add(key, value)
+				}
+			}
+			w.WriteHeader(resp.StatusCode)
+			io.Copy(w, resp.Body)
+		} else {
+			http.Error(w, "", http.StatusNotFound)
+			return
+		}
 	}
 }

@@ -10,7 +10,6 @@ import (
 	docker "github.com/docker/docker/client"
 	"github.com/docker/go-connections/sockets"
 	"github.com/fscomfs/cvmart-log-pilot/config"
-	"github.com/fscomfs/cvmart-log-pilot/pod_file"
 	"github.com/fscomfs/cvmart-log-pilot/quota"
 	retryhttp "github.com/hashicorp/go-retryablehttp"
 	"github.com/minio/minio-go/v7"
@@ -69,7 +68,6 @@ var k8sClient *kubernetes.Clientset
 var retryHttpClient *retryhttp.Client
 var quotaController *quota.Control
 var localDockerClient *docker.Client
-var podFileExporter *pod_file.PodFileExporter
 
 func InitConfig() {
 	if config.GlobConfig.RemoteProxyHost != "" && config.GlobConfig.EnableProxy {
@@ -331,14 +329,4 @@ func InitEnvDockerClient() {
 	} else {
 		localDockerClient = client
 	}
-}
-
-func InitPodFileExporter(baseDir string) {
-	podFileExporter = &pod_file.PodFileExporter{
-		BaseDir: baseDir,
-	}
-}
-
-func GetPodFileExporter() *pod_file.PodFileExporter {
-	return podFileExporter
 }

@@ -3,6 +3,7 @@ package main
 import (
 	"flag"
 	log "github.com/Sirupsen/logrus"
+	"github.com/fscomfs/cvmart-log-pilot/Service"
 	"github.com/fscomfs/cvmart-log-pilot/config"
 	"github.com/fscomfs/cvmart-log-pilot/pilot"
 	proxy "github.com/fscomfs/cvmart-log-pilot/proxy"
@@ -64,4 +65,5 @@ func configInit(baseDir string) {
 	utils.InitRetryHttpClient()
 	utils.InitQuotaController(baseDir)
 	utils.InitEnvDockerClient()
+	Service.InitPodFileExporter(baseDir)
 }

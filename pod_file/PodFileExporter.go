@@ -7,14 +7,12 @@ import (
 	"github.com/fscomfs/cvmart-log-pilot/container_log"
 	"github.com/fscomfs/cvmart-log-pilot/quota"
 	"github.com/fscomfs/cvmart-log-pilot/utils"
-	"io"
-	"io/fs"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"net"
 	"net/http"
+	"net/url"
 	"os"
 	"path/filepath"
-	"strconv"
 )
 
 type PodFileExporter struct {
@@ -35,96 +33,97 @@ type FileRes struct {
 
 var auth = container_log.AESAuth{}
 
-func (p PodFileExporter) GetPodFiles(ctx context.Context, podName string, containerId string, imageName string, containerPath string, hostPath string, w http.ResponseWriter) {
+func (p PodFileExporter) GetPodFiles(ctx context.Context, podName string, containerId string, imageName string, containerPath string, hostPath string) ([]FileRes, error) {
 	var path string
 	var err error
 	if hostPath != "" {
 		path, err = quota.FindRealPath(p.BaseDir, hostPath)
 		if err != nil {
-			utils.FAIL_RES("", nil, w)
-			return
+			return nil, fmt.Errorf("")
 		}
 	} else {
 		containerRootPath, err := getContainerDiffPath(ctx, p.BaseDir, podName, containerId, imageName)
 		if err != nil {
-			return
+			return nil, err
 		}
 
 		path = filepath.Join(containerRootPath, containerPath)
 	}
-	var fileInfos []fs.FileInfo
-	filepath.WalkDir(path, func(path string, d fs.DirEntry, err error) error {
-		if !d.IsDir() {
-			f, err := d.Info()
-			if err != nil {
-
-			}
-			fileInfos = append(fileInfos, f)
-		}
-		return nil
-	})
+	entries, _ := os.ReadDir(path)
 	var fileUrl []FileRes
-	for _, info := range fileInfos {
-		f := FileURLParam{
-			Host:    getHostIp(),
-			Path:    info.Name(),
-			ModTime: info.ModTime().UnixMilli(),
+	host := getHostIp()
+	for _, v := range entries {
+		if !v.IsDir() {
+			if info, err := v.Info(); err == nil {
+				f := FileURLParam{
+					Host:    host,
+					Path:    filepath.Join(hostPath, v.Name()),
+					ModTime: info.ModTime().UnixMilli(),
+				}
+				jsonStr, _ := json.Marshal(f)
+				t, _ := auth.GeneratorJWTToken(jsonStr)
+				fileUrl = append(fileUrl, FileRes{
+					FileName: info.Name(),
+					ModTime:  info.ModTime().UnixMilli(),
+					URL:      utils.API_FILE + url.QueryEscape(t) + "/" + url.QueryEscape(info.Name()),
+				})
+			}
 		}
-		jsonStr, _ := json.Marshal(f)
-		t, _ := auth.GeneratorJWTToken(jsonStr)
-		fileUrl = append(fileUrl, FileRes{
-			FileName: info.Name(),
-			ModTime:  info.ModTime().UnixMilli(),
-			URL:      utils.API_FILE + t + "/" + info.Name(),
-		})
 	}
-	utils.SUCCESS_RES("", fileUrl, w)
+	return fileUrl, err
 }
 
 func (p PodFileExporter) GetPodFile(file string, w http.ResponseWriter, r *http.Request) {
-	// Get request range.
-	var rs *utils.HTTPRangeSpec
-	var rangeErr error
-	rangeHeader := r.Header.Get("Range")
-	if rangeHeader != "" {
-		rs, rangeErr = utils.ParseRequestRangeSpec(rangeHeader)
-		if rangeErr == utils.ErrInvalidRange {
-			return
-		}
-	}
-	fileInfo, err := os.Stat(file)
-	if err != nil {
-
-	}
-	var start, rangeLen int64
-	lastModified := fileInfo.ModTime().UTC().Format(http.TimeFormat)
-	w.Header().Set("Last-Modified", lastModified)
-	if rs != nil {
-		// For providing ranged content
-		start, rangeLen, err = rs.GetOffsetLength(fileInfo.Size())
-		if err != nil {
-			return
-		}
-		// Set content length.
-		w.Header().Set("Content-Length", strconv.FormatInt(rangeLen, 10))
-		if rs != nil {
-			contentRange := fmt.Sprintf("bytes %d-%d/%d", start, start+rangeLen-1, fileInfo.Size())
-			w.Header().Set("Content-Range", contentRange)
-		}
-	} else {
-		start, rangeLen, err = rs.GetOffsetLength(fileInfo.Size())
-	}
-
-	fileFd, err := os.OpenFile(file, os.O_RDONLY, 0600)
-	defer fileFd.Close()
-	if err != nil {
-
-	}
-	_, _ = fileFd.Seek(start, 0)
-	reader := &io.LimitedReader{R: io.Reader(fileFd), N: rangeLen}
-	if _, err := io.Copy(w, reader); err != nil {
-
-	}
+	http.ServeFile(w, r, file)
+	//// Get request range.
+	//var rs *utils.HTTPRangeSpec
+	//var rangeErr error
+	//rangeHeader := r.Header.Get("Range")
+	//if rangeHeader != "" {
+	//	rs, rangeErr = utils.ParseRequestRangeSpec(rangeHeader)
+	//	if rangeErr == utils.ErrInvalidRange {
+	//		return
+	//	}
+	//	log.Printf("range={}", rs)
+	//}
+	//fileInfo, err := os.Stat(file)
+	//if err != nil {
+	//
+	//}
+	//var start, rangeLen int64
+	//lastModified := fileInfo.ModTime().UTC().Format(http.TimeFormat)
+	//w.Header().Set("Last-Modified", lastModified)
+	//if rs != nil {
+	//	w.Header().Set("Accept-Ranges", "bytes")
+	//	// For providing ranged content
+	//	start, rangeLen, err = rs.GetOffsetLength(fileInfo.Size())
+	//	if err != nil {
+	//		return
+	//	}
+	//	// Set content length.
+	//	w.Header().Set("Content-Length", strconv.FormatInt(rangeLen, 10))
+	//	contentRange := fmt.Sprintf("bytes %d-%d/%d", start, start+rangeLen-1, fileInfo.Size())
+	//	w.Header().Set("Content-Range", contentRange)
+	//
+	//	//w.Header().Set("Content-Type", "video/mp4")
+	//	w.WriteHeader(http.StatusPartialContent)
+	//} else {
+	//	start, rangeLen, err = rs.GetOffsetLength(fileInfo.Size())
+	//}
+	//fileFd, err := os.OpenFile(file, os.O_RDONLY, 0600)
+	//defer fileFd.Close()
+	//if err != nil {
+	//	w.WriteHeader(http.StatusNotFound)
+	//}
+	//_, err = fileFd.Seek(start, 0)
+	//if err != nil {
+	//	w.WriteHeader(http.StatusNotFound)
+	//	return
+	//}
+	//reader := &io.LimitedReader{R: io.Reader(fileFd), N: rangeLen}
+	//if _, err := io.Copy(w, reader); err != nil {
+	//	w.WriteHeader(http.StatusNotFound)
+	//}
 
 }
 

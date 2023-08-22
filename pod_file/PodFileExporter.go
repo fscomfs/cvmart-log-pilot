@@ -65,7 +65,7 @@ func (p PodFileExporter) GetPodFiles(ctx context.Context, podName string, contai
 				fileUrl = append(fileUrl, FileRes{
 					FileName: info.Name(),
 					ModTime:  info.ModTime().UnixMilli(),
-					URL:      utils.API_FILE + url.QueryEscape(t) + "/" + url.QueryEscape(info.Name()),
+					URL:      utils.API_FILE + fmt.Sprintf("%d/", f.ModTime) + url.QueryEscape(info.Name()) + "?token=" + url.QueryEscape(t),
 				})
 			}
 		}

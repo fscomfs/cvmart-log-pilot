@@ -104,9 +104,8 @@ func PodFilesHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func PodFileHandler(w http.ResponseWriter, r *http.Request) {
-	path := r.URL.Path
-	fileName := path[strings.LastIndex(path, "/")+1:]
-	token := strings.TrimPrefix(path[:strings.LastIndex(path, "/")], utils.API_FILE)
+	path := strings.TrimPrefix(r.URL.Path, utils.API_FILE)
+	token := r.URL.Query().Get("token")
 	p := &pod_file.FileURLParam{}
 	res, err := auth.AuthJWTToken(token)
 	err = json.Unmarshal(res, p)
@@ -121,8 +120,7 @@ func PodFileHandler(w http.ResponseWriter, r *http.Request) {
 		p.Host = "localhost"
 		j, _ := json.Marshal(p)
 		t, _ := auth.GeneratorJWTToken(j)
-		log.Printf("pod file param={}", string(j))
-		url := utils.GetURLByHost(host) + utils.API_FILE + url2.QueryEscape(t) + "/" + url2.QueryEscape(fileName)
+		url := utils.GetURLByHost(host) + utils.API_FILE + path + "?token=" + url2.QueryEscape(t)
 		req, err := http.NewRequest(r.Method, url, r.Body)
 		if err != nil {
 			http.Error(w, "", http.StatusNotFound)
@@ -140,7 +138,12 @@ func PodFileHandler(w http.ResponseWriter, r *http.Request) {
 					w.Header().Add(key, value)
 				}
 			}
-			w.WriteHeader(resp.StatusCode)
+			if resp.StatusCode == 301 {
+				w.WriteHeader(http.StatusNotFound)
+			} else {
+				w.WriteHeader(resp.StatusCode)
+			}
+
 			io.Copy(w, resp.Body)
 		} else {
 			http.Error(w, "", http.StatusNotFound)

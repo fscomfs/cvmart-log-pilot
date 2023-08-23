@@ -96,6 +96,8 @@ func PodFilesHandler(w http.ResponseWriter, r *http.Request) {
 		}
 		resp, err := utils.GetHttpClient(host).Do(req)
 		if err == nil {
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(resp.StatusCode)
 			io.Copy(w, resp.Body)
 		} else {
 			utils.FAIL_RES(err.Error(), nil, w)
@@ -120,7 +122,7 @@ func PodFileHandler(w http.ResponseWriter, r *http.Request) {
 		p.Host = "localhost"
 		j, _ := json.Marshal(p)
 		t, _ := auth.GeneratorJWTToken(j)
-		url := utils.GetURLByHost(host) + utils.API_FILE + path + "?token=" + url2.QueryEscape(t)
+		url := utils.GetURLByHost(host) + utils.API_FILE + url2.QueryEscape(path) + "?token=" + url2.QueryEscape(t)
 		req, err := http.NewRequest(r.Method, url, r.Body)
 		if err != nil {
 			http.Error(w, "", http.StatusNotFound)

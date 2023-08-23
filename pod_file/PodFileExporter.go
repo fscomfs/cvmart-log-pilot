@@ -8,11 +8,13 @@ import (
 	"github.com/fscomfs/cvmart-log-pilot/quota"
 	"github.com/fscomfs/cvmart-log-pilot/utils"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"log"
 	"net"
 	"net/http"
 	"net/url"
 	"os"
 	"path/filepath"
+	"strings"
 )
 
 type PodFileExporter struct {
@@ -46,8 +48,13 @@ func (p PodFileExporter) GetPodFiles(ctx context.Context, podName string, contai
 		if err != nil {
 			return nil, err
 		}
-
-		path = filepath.Join(containerRootPath, containerPath)
+		log.Printf("podName=%s,containerId=%s,imageName=%s,containerPath=%s,hostPath=%s,getContainerDiffPath path=%s", podName, containerId, imageName, containerPath, hostPath, containerRootPath)
+		path, err = quota.FindRealPath(containerRootPath, containerPath)
+		if err != nil {
+			log.Printf("GetPodFiles err=%s", err.Error())
+			return nil, err
+		}
+		log.Printf("podName=%s,containerId=%s,imageName=%s,containerPath=%s,hostPath=%s,getContainerDiffPath relPath=%s", podName, containerId, imageName, containerPath, hostPath, path)
 	}
 	entries, _ := os.ReadDir(path)
 	var fileUrl []FileRes
@@ -57,7 +64,7 @@ func (p PodFileExporter) GetPodFiles(ctx context.Context, podName string, contai
 			if info, err := v.Info(); err == nil {
 				f := FileURLParam{
 					Host:    host,
-					Path:    filepath.Join(hostPath, v.Name()),
+					Path:    filepath.Join(path, v.Name()),
 					ModTime: info.ModTime().UnixMilli(),
 				}
 				jsonStr, _ := json.Marshal(f)
@@ -134,13 +141,13 @@ func getContainerDiffPath(ctx context.Context, baseDir, podName string, containe
 			Watch: false,
 		}
 		listOption.FieldSelector = "metadata.name=" + podName
-		listOption.LabelSelector = "app=" + podName
+		//listOption.LabelSelector = "app=" + podName
 		podList, err := utils.GetK8sClient().CoreV1().Pods("default").List(context.Background(), listOption)
 		if err != nil || len(podList.Items) == 0 {
-
+			log.Printf("pod not found podName=%s", podName)
 		} else {
 			pod := podList.Items[0]
-			containerId = pod.Status.ContainerStatuses[0].ContainerID
+			containerId = strings.TrimPrefix(pod.Status.ContainerStatuses[0].ContainerID, "docker://")
 		}
 
 	}

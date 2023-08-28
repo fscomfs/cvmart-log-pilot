@@ -25,3 +25,4 @@ _testmain.go
 bin/
 docker-images/pilot
 vendor/
+filebeat-binary/

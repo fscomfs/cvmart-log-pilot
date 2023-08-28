@@ -43,6 +43,8 @@ const (
 	API_GETIMAGEQUOTAINFO  = "/api/getImageQuotaInfo"
 	API_FILES              = "/api/listFiles"
 	API_FILE               = "/api/file/"
+	API_TAIL_FILE          = "/api/tailFile"
+	INTER_TAIL_FILE        = "/inter/tailFile"
 	SUCCESS_CODE           = 200
 	FAIL_CODE              = 999
 )
@@ -329,4 +331,15 @@ func InitEnvDockerClient() {
 	} else {
 		localDockerClient = client
 	}
+}
+
+var LOG_MESSAGE = []byte{'1', '0', '0', '0'}
+var LOG_STAT_MESSAGE = []byte{'0', '0', '0', '0'}
+
+func LogMessage(message []byte) []byte {
+	return append(LOG_MESSAGE, message...)
+}
+
+func LogStatMessage(message []byte) []byte {
+	return append(LOG_STAT_MESSAGE, message...)
 }

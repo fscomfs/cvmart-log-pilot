@@ -277,19 +277,20 @@ func containerGpuInfo(ctx context.Context, host string, containerID string, hand
 		return true, err
 	}
 	defer c.Close()
-	for {
+	go func() {
 		select {
 		case <-ctx.Done():
 			log.Printf("-----------gpu End----------------------")
-			return false, nil
-		default:
-			_, content, err := c.ReadMessage()
-			if err != nil {
-				return true, err
-			}
-			handler(content)
+			c.Close()
+			return
 		}
-
+	}()
+	for {
+		_, content, err := c.ReadMessage()
+		if err != nil {
+			return true, err
+		}
+		handler(content)
 	}
 	return true, nil
 }

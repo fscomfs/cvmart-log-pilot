@@ -1,12 +1,14 @@
 package pod_file
 
 import (
+	"bufio"
 	"context"
 	"encoding/json"
 	"fmt"
 	"github.com/fscomfs/cvmart-log-pilot/container_log"
 	"github.com/fscomfs/cvmart-log-pilot/quota"
 	"github.com/fscomfs/cvmart-log-pilot/utils"
+	"github.com/gorilla/websocket"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"log"
 	"net"
@@ -15,6 +17,9 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"syscall"
+	"time"
+	"unicode/utf8"
 )
 
 type PodFileExporter struct {
@@ -134,6 +139,117 @@ func (p PodFileExporter) GetPodFile(file string, w http.ResponseWriter, r *http.
 
 }
 
+func (p PodFileExporter) TailContainerFile(ctx context.Context, containerId, containerFilePath string, conn *websocket.Conn) (bool, error) {
+	log.Printf("tail contaienr file containerId = %+v,containerFilepath = %+v", containerId, containerFilePath)
+	diffPath, err := getContainerDiffPath(ctx, p.BaseDir, "", containerId, "")
+	if err != nil {
+		return false, err
+	}
+	log.Printf("tail contaienr file containerDiffPath = %+v", diffPath)
+	relPath, err := quota.FindRealPath(diffPath, containerFilePath)
+	if err != nil {
+		return false, err
+	}
+
+	p.TailFile(ctx, relPath, conn)
+	log.Printf("tail file done")
+	return true, nil
+}
+
+func (p PodFileExporter) TailFile(ctx context.Context, file string, conn *websocket.Conn) {
+	log.Printf("tail file name %s", file)
+	var fileInode uint64
+	dotail := func() {
+		var tailFile *os.File
+		var err error
+		var fileInfo os.FileInfo
+		done := make(chan struct{})
+		go func() {
+			for {
+				select {
+				case <-ctx.Done():
+					close(done)
+					return
+				default:
+					tailFile, err = os.OpenFile(file, os.O_RDONLY, 0)
+					if err == nil {
+						fileInfo, err = tailFile.Stat()
+						if err == nil {
+							fileInode = fileInfo.Sys().(*syscall.Stat_t).Ino
+							close(done)
+							return
+						}
+					}
+					time.Sleep(time.Second * 2)
+				}
+			}
+		}()
+		<-done
+		reader := bufio.NewReader(tailFile)
+		var last200Lines []string
+		var index int64
+		for fileInfo.Size() > 0 {
+			line, err := reader.ReadBytes('\n')
+			if line != nil && len(line) > 0 {
+				index += int64(len(line))
+				last200Lines = append(last200Lines, string(line))
+				if len(last200Lines) > 2000 {
+					last200Lines = last200Lines[1:]
+				}
+			}
+			if err != nil {
+				break
+			}
+		}
+		if len(last200Lines) > 0 {
+			buf := []byte{}
+			for _, line := range last200Lines {
+				buf = append(buf, []byte(line)...)
+			}
+			conn.WriteMessage(websocket.BinaryMessage, utils.LogMessage(buf))
+		}
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			default:
+				app := []byte{}
+				for {
+					a, size, err := reader.ReadRune()
+					if err != nil {
+						finfo, err := os.Stat(file)
+						if err != nil {
+							return
+						}
+						curFd := finfo.Sys().(*syscall.Stat_t).Ino
+						if curFd != fileInode {
+							return
+						}
+						break
+					}
+					index += int64(size)
+					byteArr := make([]byte, utf8.RuneLen(a))
+					utf8.EncodeRune(byteArr, a)
+					app = append(app, byteArr...)
+				}
+				if len(app) > 0 {
+					conn.WriteMessage(websocket.BinaryMessage, utils.LogMessage(app))
+				} else {
+					time.Sleep(time.Second * 1)
+				}
+			}
+		}
+	}
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		default:
+			dotail()
+		}
+	}
+}
+
 func getContainerDiffPath(ctx context.Context, baseDir, podName string, containerId string, imageName string) (string, error) {
 	var containerDir string
 	if podName != "" {
@@ -167,14 +283,14 @@ func getContainerDiffPath(ctx context.Context, baseDir, podName string, containe
 			return "", err
 		} else {
 			for key, val := range container.GraphDriver.Data {
-				if key == "UpperDir" {
+				if key == "MergedDir" {
 					targetPath = val
 				}
 			}
 		}
 	}
 	if targetPath == "" {
-		return "", fmt.Errorf("path not found")
+		return "", fmt.Errorf("container path not found")
 	}
 	containerDir, err := quota.FindRealPath(baseDir, targetPath)
 	if err != nil {

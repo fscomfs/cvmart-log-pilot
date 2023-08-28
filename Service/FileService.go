@@ -2,10 +2,16 @@ package Service
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
+	"fmt"
+	"github.com/fscomfs/cvmart-log-pilot/config"
 	"github.com/fscomfs/cvmart-log-pilot/pod_file"
 	"github.com/fscomfs/cvmart-log-pilot/utils"
+	"github.com/gorilla/websocket"
 	"io"
+	coreV1 "k8s.io/api/core/v1"
+	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"log"
 	"net/http"
 	url2 "net/url"
@@ -27,11 +33,155 @@ type FilesReq struct {
 	ContainerPath string `json:"containerPath"`
 }
 
+type TailParam struct {
+	ContainerPath string `json:"containerPath"`
+	PodLabel      string `json:"podLabel"`
+	Namespace     string `json:"namespace"`
+}
+
+type TailInterParam struct {
+	ContainerPath string `json:"containerPath"`
+	ContainerId   string `json:"containerId"`
+}
+
 var podFileExporter *pod_file.PodFileExporter
 
 func InitPodFileExporter(baseDir string) {
 	podFileExporter = &pod_file.PodFileExporter{
 		BaseDir: baseDir,
+	}
+}
+
+func TailFileInterHandler(w http.ResponseWriter, r *http.Request) {
+	values := r.URL.Query()
+	containerId := values.Get("containerId")
+	containerPath := values.Get("containerPath")
+	conn, err := upgrader.Upgrade(w, r, nil)
+	if err != nil {
+		log.Printf("RequestHandler upgrader %+v", err)
+		return
+	}
+	ctx, cancelFunc := context.WithCancel(r.Context())
+	go func() {
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			default:
+				_, err := GetPodFileExporter().TailContainerFile(ctx, containerId, containerPath, conn)
+				if err != nil {
+					log.Printf("tail log error=%+v", err)
+				}
+				time.Sleep(time.Second * 8)
+			}
+		}
+	}()
+	readLoop(conn)
+	cancelFunc()
+
+}
+
+func readLoop(conn *websocket.Conn) {
+	for {
+		_, _, err := conn.ReadMessage()
+		if err != nil {
+			break
+		}
+	}
+}
+func TailFileHandler(w http.ResponseWriter, r *http.Request) {
+	values := r.URL.Query()
+	token := values.Get("token")
+	res, err := auth.AuthJWTToken(token)
+	if err != nil {
+		w.WriteHeader(http.StatusUnauthorized)
+		w.Write([]byte(err.Error()))
+		return
+	}
+	tailParam := &TailParam{}
+	err = json.Unmarshal(res, tailParam)
+	if err != nil {
+		w.WriteHeader(http.StatusUnauthorized)
+		w.Write([]byte(err.Error()))
+		return
+	}
+	conn, err := upgrader.Upgrade(w, r, nil)
+	if err != nil {
+		log.Printf("RequestHandler upgrader %+v", err)
+		return
+	}
+	ctx, cancelFunc := context.WithCancel(context.Background())
+	waitingtime := 0
+	go func() {
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			default:
+				//async exec
+				listOption := v1.ListOptions{
+					Watch:         false,
+					LabelSelector: "app=" + tailParam.PodLabel,
+				}
+				podList, err := utils.GetK8sClient().CoreV1().Pods(tailParam.Namespace).List(ctx, listOption)
+				host := ""
+				containerId := ""
+				var pod *coreV1.Pod = nil
+				if err == nil && len(podList.Items) > 0 {
+					pod = &podList.Items[0]
+					if host == "" {
+						host = pod.Status.HostIP
+						containerId = strings.TrimPrefix(pod.Status.ContainerStatuses[0].ContainerID, "docker://")
+					}
+				}
+				if containerId != "" {
+					conn.WriteMessage(websocket.BinaryMessage, utils.LogMessage([]byte(fmt.Sprintf("\r                                                                ", waitingtime))))
+					_, err := doRemoteTail(ctx, conn, host, containerId, tailParam.ContainerPath)
+					if err != nil {
+						log.Printf("do Remote tail file error %+v", err)
+					}
+				} else {
+					waitingtime += 5
+					conn.WriteMessage(websocket.BinaryMessage, utils.LogMessage([]byte(fmt.Sprintf("\rwaiting container start %ds", waitingtime))))
+				}
+				time.Sleep(time.Second * 5)
+			}
+		}
+	}()
+	readLoop(conn)
+	cancelFunc()
+}
+
+func doRemoteTail(ctx context.Context, conn *websocket.Conn, host string, containerId string, containerPath string) (bool, error) {
+	host = host + fmt.Sprintf(":%d", config.GlobConfig.ServerPort)
+	u := url2.URL{Scheme: "ws", Host: host, Path: utils.INTER_TAIL_FILE}
+	d := websocket.Dialer{
+		Proxy:            utils.GetProxy(host),
+		HandshakeTimeout: 45 * time.Second,
+	}
+	remoteConn, r2, err := d.DialContext(ctx, u.String()+"?containerId="+url2.QueryEscape(containerId)+"&containerPath="+url2.QueryEscape(containerPath), nil)
+	if err != nil {
+		if r2 != nil && r2.StatusCode == http.StatusNoContent {
+			return false, fmt.Errorf("not content")
+		}
+		log.Printf("doRemoteTail err:%+v", err)
+		return true, err
+	}
+	defer remoteConn.Close()
+	go func() {
+		select {
+		case <-ctx.Done():
+			log.Printf("tail file end")
+			remoteConn.Close()
+			return
+		}
+	}()
+	for {
+		_, content, err := remoteConn.ReadMessage()
+		if err != nil {
+			return true, err
+		}
+		conn.WriteMessage(websocket.BinaryMessage, content)
 	}
 }
 
@@ -123,7 +273,7 @@ func PodFileHandler(w http.ResponseWriter, r *http.Request) {
 		j, _ := json.Marshal(p)
 		t, _ := auth.GeneratorJWTToken(j)
 		url := utils.GetURLByHost(host) + utils.API_FILE + url2.QueryEscape(path) + "?token=" + url2.QueryEscape(t)
-		req, err := http.NewRequest(r.Method, url, r.Body)
+		req, err := http.NewRequestWithContext(r.Context(), r.Method, url, r.Body)
 		if err != nil {
 			http.Error(w, "", http.StatusNotFound)
 			return
@@ -145,7 +295,6 @@ func PodFileHandler(w http.ResponseWriter, r *http.Request) {
 			} else {
 				w.WriteHeader(resp.StatusCode)
 			}
-
 			io.Copy(w, resp.Body)
 		} else {
 			http.Error(w, "", http.StatusNotFound)

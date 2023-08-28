@@ -22,5 +22,7 @@ func Handler() {
 	http.HandleFunc(utils.API_GETIMAGEQUOTAINFO, Service.GetImageDiskQuotaInfoHandler)
 	http.HandleFunc(utils.API_FILES, Service.PodFilesHandler)
 	http.HandleFunc(utils.API_FILE, Service.PodFileHandler)
+	http.HandleFunc(utils.API_TAIL_FILE, Service.TailFileHandler)
+	http.HandleFunc(utils.INTER_TAIL_FILE, Service.TailFileInterHandler)
 	http.ListenAndServe(fmt.Sprintf(":%d", config.GlobConfig.ServerPort), nil)
 }

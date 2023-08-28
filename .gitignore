@@ -24,4 +24,4 @@ _testmain.go
 *.prof
 bin/
 docker-images/pilot
-/vendor
+vendor/

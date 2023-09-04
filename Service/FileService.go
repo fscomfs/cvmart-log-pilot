@@ -135,7 +135,9 @@ func TailFileHandler(w http.ResponseWriter, r *http.Request) {
 					}
 				}
 				if containerId != "" {
-					conn.WriteMessage(websocket.BinaryMessage, utils.LogMessage([]byte(fmt.Sprintf("\r                                                                ", waitingtime))))
+					if waitingtime > 0 {
+						conn.WriteMessage(websocket.BinaryMessage, utils.LogMessage([]byte(fmt.Sprintf("\r                                                                "))))
+					}
 					_, err := doRemoteTail(ctx, conn, host, containerId, tailParam.ContainerPath)
 					if err != nil {
 						log.Printf("do Remote tail file error %+v", err)

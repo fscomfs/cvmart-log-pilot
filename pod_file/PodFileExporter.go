@@ -36,6 +36,7 @@ type FileRes struct {
 	FileName string `json:"fileName"`
 	ModTime  int64  `json:"modTime"`
 	URL      string `json:"url"`
+	FileSize int64  `json:"fileSize"`
 }
 
 var auth = container_log.AESAuth{}
@@ -77,6 +78,7 @@ func (p PodFileExporter) GetPodFiles(ctx context.Context, podName string, contai
 				fileUrl = append(fileUrl, FileRes{
 					FileName: info.Name(),
 					ModTime:  info.ModTime().UnixMilli(),
+					FileSize: info.Size(),
 					URL:      utils.API_FILE + fmt.Sprintf("%d/", f.ModTime) + url.QueryEscape(info.Name()) + "?token=" + url.QueryEscape(t),
 				})
 			}

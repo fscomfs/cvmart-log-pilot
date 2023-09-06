@@ -63,7 +63,7 @@ func (p PodFileExporter) GetPodFiles(ctx context.Context, podName string, contai
 		log.Printf("podName=%s,containerId=%s,imageName=%s,containerPath=%s,hostPath=%s,getContainerDiffPath relPath=%s", podName, containerId, imageName, containerPath, hostPath, path)
 	}
 	entries, _ := os.ReadDir(path)
-	var fileUrl []FileRes
+	var fileUrl []FileRes = []FileRes{}
 	host := getHostIp()
 	for _, v := range entries {
 		if !v.IsDir() {

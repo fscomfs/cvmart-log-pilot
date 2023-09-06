@@ -576,6 +576,9 @@ func FindRealPath(prefixPath string, spath string) (relPath string, err error) {
 				if relPath, err2 := os.Readlink(currentDir); err2 != nil {
 					return "", err2
 				} else {
+					if !strings.HasPrefix(relPath, "/") { //
+						relPath = filepath.Join(filepath.Dir(currentDir), relPath)
+					}
 					rel := path.Join("/", prefixPath, relPath)
 					if _, err2 := os.Stat(rel); err2 == nil {
 						currentDir = rel

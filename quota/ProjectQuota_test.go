@@ -86,7 +86,7 @@ func TestReleaseDir(t *testing.T) {
 }
 
 func TestGetRealPath(t *testing.T) {
-	linkPath := "/linktest/link1/link2/dir2"
+	linkPath := "/tmp/A/B/222"
 
 	rel, err := FindRealPath("", linkPath)
 	if err != nil {

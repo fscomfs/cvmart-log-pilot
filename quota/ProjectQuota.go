@@ -44,7 +44,6 @@ import (
 	"context"
 	"fmt"
 	log "github.com/Sirupsen/logrus"
-	"github.com/docker/docker/api/types"
 	docker "github.com/docker/docker/client"
 	"github.com/pkg/errors"
 	"github.com/shirou/gopsutil/disk"
@@ -199,27 +198,30 @@ func (q *Control) GetImageDiskQuotaInfo(imageName string, dockerClient *docker.C
 	log.Printf("GetImageDiskQuotaInfo imageName=%s", imageName)
 	var stat syscall.Statfs_t
 	quotaInfo = QuotaInfo{Path: ""}
-	var imageID string
-	images, err := dockerClient.ImageList(context.Background(), types.ImageListOptions{})
-	if err == nil {
-		for _, image := range images {
-			for _, tag := range image.RepoTags {
-				if tag == imageName {
-					imageID = image.ID
-					break
-				}
-			}
-			if imageID != "" {
-				break
-			}
-		}
-	}
-
-	if imageID == "" {
-		return quotaInfo, fmt.Errorf("image not fount")
-	}
+	//var imageID string
+	//images, err := dockerClient.ImageList(context.Background(), types.ImageListOptions{})
+	//if err == nil {
+	//	for _, image := range images {
+	//		for _, tag := range image.RepoTags {
+	//			if tag == imageName {
+	//				imageID = image.ID
+	//				break
+	//			}
+	//		}
+	//		if imageID != "" {
+	//			break
+	//		}
+	//	}
+	//}
+	//
+	//if imageID == "" {
+	//	return quotaInfo, fmt.Errorf("image not found")
+	//}
 	var targetPath string
-	imgInspcet, _, err := dockerClient.ImageInspectWithRaw(context.Background(), imageID)
+	imgInspcet, _, err := dockerClient.ImageInspectWithRaw(context.Background(), imageName)
+	if err != nil {
+		return quotaInfo, fmt.Errorf("image not found")
+	}
 	if err == nil {
 		for key, val := range imgInspcet.GraphDriver.Data {
 			if key == "UpperDir" {

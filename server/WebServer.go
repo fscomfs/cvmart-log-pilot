@@ -24,5 +24,7 @@ func Handler() {
 	http.HandleFunc(utils.API_FILE, Service.PodFileHandler)
 	http.HandleFunc(utils.API_TAIL_FILE, Service.TailFileHandler)
 	http.HandleFunc(utils.INTER_TAIL_FILE, Service.TailFileInterHandler)
+	http.HandleFunc(utils.API_LIST_MODEL_FILE, Service.ListModelFile)
+	http.HandleFunc(utils.API_SAVE_MODEL_FILE, Service.SaveModelFile)
 	http.ListenAndServe(fmt.Sprintf(":%d", config.GlobConfig.ServerPort), nil)
 }

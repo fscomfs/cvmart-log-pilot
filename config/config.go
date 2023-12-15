@@ -8,7 +8,10 @@ import (
 	"strings"
 )
 
-var GlobConfig Config
+var (
+	GlobConfig Config
+	BaseDir    string
+)
 
 type Config struct {
 	ServerPort       int        `json:"server_port"`

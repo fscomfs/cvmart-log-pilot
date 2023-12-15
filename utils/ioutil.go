@@ -20,7 +20,10 @@
 package utils
 
 import (
+	"archive/tar"
 	"context"
+	"fmt"
+	"github.com/klauspost/compress/gzip"
 	"io"
 	"os"
 	"sync"
@@ -241,3 +244,106 @@ func SameFile(fi1, fi2 os.FileInfo) bool {
 // DirectioAlignSize - DirectIO alignment needs to be 4K. Defined here as
 // directio.AlignSize is defined as 0 in MacOS causing divide by 0 error.
 const DirectioAlignSize = 4096
+
+type TarFile struct {
+	Path string
+}
+type FileItem struct {
+	Name string
+	Size int64
+}
+
+func (f *TarFile) ListFiles() []FileItem {
+	res := []FileItem{}
+	tarFile, _ := os.Open(f.Path)
+	defer tarFile.Close()
+	r, err := gzip.NewReader(tarFile)
+	var reader io.Reader
+	if err != nil {
+		f, _ := os.Open(f.Path)
+		defer f.Close()
+		reader = f
+	} else {
+		reader = r
+	}
+	tarReader := tar.NewReader(reader)
+	for {
+		header, err := tarReader.Next()
+		if err != nil {
+			if err == io.EOF {
+				break
+			}
+		}
+		if header.Typeflag == tar.TypeDir {
+			continue
+		}
+		res = append(res, FileItem{
+			Name: header.Name,
+			Size: header.Size,
+		})
+	}
+	return res
+}
+
+func (f *TarFile) ExtractFile(fileName string, dst io.Writer) error {
+	tarFile, _ := os.Open(f.Path)
+	defer tarFile.Close()
+	r, err := gzip.NewReader(tarFile)
+	var reader io.Reader
+	if err != nil {
+		tarFile.Close()
+		f, _ := os.Open(f.Path)
+		reader = f
+		defer f.Close()
+	} else {
+		reader = r
+	}
+	tarReader := tar.NewReader(reader)
+	for {
+		header, err := tarReader.Next()
+		if err != nil {
+			if err == io.EOF {
+				break
+			}
+			return err
+		}
+		if header.Name == fileName {
+			io.Copy(dst, tarReader)
+			return nil
+		}
+	}
+	return fmt.Errorf("not found file:%v", fileName)
+}
+
+func (f *TarFile) ExtractFileTo(fileNames []string, cal func(fileName string, reader io.Reader)) error {
+	tarFile, _ := os.Open(f.Path)
+	defer tarFile.Close()
+	r, err := gzip.NewReader(tarFile)
+	var reader io.Reader
+	if err != nil {
+		tarFile.Close()
+		f, _ := os.Open(f.Path)
+		reader = f
+		defer f.Close()
+	} else {
+		reader = r
+	}
+	tarReader := tar.NewReader(reader)
+	for {
+		header, err := tarReader.Next()
+		if err != nil {
+			if err == io.EOF {
+				break
+			}
+			return err
+		}
+		for _, name := range fileNames {
+			if header.Name == name {
+				cal(name, tarReader)
+				return nil
+			}
+		}
+
+	}
+	return nil
+}

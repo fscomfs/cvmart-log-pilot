@@ -45,6 +45,7 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
+	config.BaseDir = baseDir
 	configInit(baseDir)
 	go server.Handler()
 	if config.GlobConfig.EnableProxy {

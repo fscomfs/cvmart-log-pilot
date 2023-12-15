@@ -44,6 +44,8 @@ const (
 	API_FILES              = "/api/listFiles"
 	API_FILE               = "/api/file/"
 	API_TAIL_FILE          = "/api/tailFile"
+	API_LIST_MODEL_FILE    = "/api/listModeFile"
+	API_SAVE_MODEL_FILE    = "/api/saveModeFile"
 	INTER_TAIL_FILE        = "/inter/tailFile"
 	SUCCESS_CODE           = 200
 	FAIL_CODE              = 999

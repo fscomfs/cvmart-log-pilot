@@ -249,13 +249,16 @@ type TarFile struct {
 	Path string
 }
 type FileItem struct {
-	Name string
-	Size int64
+	Name string `json:"name"`
+	Size int64  `json:"size"`
 }
 
-func (f *TarFile) ListFiles() []FileItem {
+func (f *TarFile) ListFiles() ([]FileItem, error) {
 	res := []FileItem{}
-	tarFile, _ := os.Open(f.Path)
+	tarFile, err := os.Open(f.Path)
+	if err != nil {
+		return nil, err
+	}
 	defer tarFile.Close()
 	r, err := gzip.NewReader(tarFile)
 	var reader io.Reader
@@ -282,7 +285,7 @@ func (f *TarFile) ListFiles() []FileItem {
 			Size: header.Size,
 		})
 	}
-	return res
+	return res, nil
 }
 
 func (f *TarFile) ExtractFile(fileName string, dst io.Writer) error {
@@ -340,7 +343,6 @@ func (f *TarFile) ExtractFileTo(fileNames []string, cal func(fileName string, re
 		for _, name := range fileNames {
 			if header.Name == name {
 				cal(name, tarReader)
-				return nil
 			}
 		}
 

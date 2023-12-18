@@ -10,9 +10,9 @@ import (
 	"github.com/minio/minio-go/v7"
 	"github.com/minio/minio-go/v7/pkg/credentials"
 	"io"
+	"log"
 	"net/http"
 	"path"
-	"sort"
 	"strings"
 )
 
@@ -45,7 +45,7 @@ type SaveModelResp struct {
 	ErrorMessage string   `json:"errorMessage"`
 }
 type ListModelResp struct {
-	Files []utils.FileItem
+	Files []utils.FileItem `json:"files"`
 }
 
 func ListModelFile(w http.ResponseWriter, r *http.Request) {
@@ -62,8 +62,13 @@ func ListModelFile(w http.ResponseWriter, r *http.Request) {
 	relFile := path.Join(relPath, param.FileName)
 
 	tarFile := utils.TarFile{Path: relFile}
+	list, err := tarFile.ListFiles()
+	if err != nil {
+		utils.FAIL_RES(err.Error(), nil, w)
+		return
+	}
 	res := ListModelResp{
-		Files: tarFile.ListFiles(),
+		Files: list,
 	}
 	utils.SUCCESS_RES("", res, w)
 }
@@ -72,18 +77,24 @@ func SaveModelFile(w http.ResponseWriter, r *http.Request) {
 	if RequestAndRedirect(w, r) {
 		return
 	}
+
 	var param SaveModeParam
 	err := json.NewDecoder(r.Body).Decode(&param)
 	if err != nil {
 		utils.FAIL_RES("request param error", nil, w)
 		return
 	}
+	log.Printf("[SaveModelFile] param:%v", param)
 	relPath, err := quota.FindRealPath(config.BaseDir, param.HostPath)
 	relFile := path.Join(relPath, param.FileName)
 
 	tarFile := utils.TarFile{Path: relFile}
 	res := SaveModelResp{}
 	secure := strings.HasPrefix(param.MinioEndpoint, "https")
+	if strings.HasPrefix(param.MinioEndpoint, "http") {
+		param.MinioEndpoint = strings.TrimPrefix(param.MinioEndpoint, "https://")
+		param.MinioEndpoint = strings.TrimPrefix(param.MinioEndpoint, "http://")
+	}
 	client, err := minio.New(param.MinioEndpoint, &minio.Options{
 		Creds:  credentials.NewStaticV4(param.AccessKey, param.SecretKey, ""),
 		Secure: secure,
@@ -101,12 +112,23 @@ func SaveModelFile(w http.ResponseWriter, r *http.Request) {
 		unSaved := make([]string, 0)
 		notFound := make([]string, 0)
 		errorMessage := ""
+		if ok, err := client.BucketExists(context.Background(), param.ObjectBucket); err == nil && ok {
+
+		} else {
+			client.MakeBucket(context.Background(), param.ObjectBucket, minio.MakeBucketOptions{})
+		}
 		err = tarFile.ExtractFileTo(needSaveFileNames, func(fileName string, reader io.Reader) {
-			i := sort.Search(len(needSaveFileNames), func(i int) bool {
-				return param.SaveItem[i].FileName == fileName
-			})
+			objName := ""
+			for _, item := range param.SaveItem {
+				if item.FileName == fileName {
+					objName = item.ObjectName
+				}
+			}
 			err = retry.Do(func() error {
-				_, err := client.PutObject(context.Background(), param.ObjectBucket, param.SaveItem[i].ObjectName, reader, 0, minio.PutObjectOptions{})
+				_, err := client.PutObject(context.Background(), param.ObjectBucket, objName, reader, 0, minio.PutObjectOptions{})
+				if err != nil {
+					log.Printf("[SaveModelFile] put object error:%v", err)
+				}
 				return err
 			}, retry.Attempts(5), retry.MaxDelay(10))
 			if err != nil {

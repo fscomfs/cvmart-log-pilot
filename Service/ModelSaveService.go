@@ -49,7 +49,7 @@ type ListModelResp struct {
 }
 
 func ListModelFile(w http.ResponseWriter, r *http.Request) {
-	if RequestAndRedirect(w, r) {
+	if ok, err := RequestAndRedirect(w, r); err != nil || ok {
 		return
 	}
 	var param ListModelParam
@@ -67,14 +67,14 @@ func ListModelFile(w http.ResponseWriter, r *http.Request) {
 		utils.FAIL_RES(err.Error(), nil, w)
 		return
 	}
-	res := ListModelResp{
-		Files: list,
-	}
-	utils.SUCCESS_RES("", res, w)
+	//res := ListModelResp{
+	//	Files: list,
+	//}
+	utils.SUCCESS_RES("", list, w)
 }
 
 func SaveModelFile(w http.ResponseWriter, r *http.Request) {
-	if RequestAndRedirect(w, r) {
+	if ok, err := RequestAndRedirect(w, r); ok && err == nil {
 		return
 	}
 

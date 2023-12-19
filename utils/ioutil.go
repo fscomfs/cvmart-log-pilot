@@ -249,8 +249,9 @@ type TarFile struct {
 	Path string
 }
 type FileItem struct {
-	Name string `json:"name"`
-	Size int64  `json:"size"`
+	Name       string    `json:"name"`
+	Size       int64     `json:"size"`
+	CreateTime time.Time `json:"createTime"`
 }
 
 func (f *TarFile) ListFiles() ([]FileItem, error) {
@@ -281,8 +282,9 @@ func (f *TarFile) ListFiles() ([]FileItem, error) {
 			continue
 		}
 		res = append(res, FileItem{
-			Name: header.Name,
-			Size: header.Size,
+			Name:       header.Name,
+			Size:       header.Size,
+			CreateTime: header.ModTime,
 		})
 	}
 	return res, nil

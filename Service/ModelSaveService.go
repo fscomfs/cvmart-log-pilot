@@ -162,15 +162,16 @@ func SaveModelFile(w http.ResponseWriter, r *http.Request) {
 		go doSave(func(err2 error) {
 			if err2 != nil {
 				res.ErrorMessage += err2.Error() + "\n"
-				if param.CallBack != "" {
-					utils.GetRetryHttpClient().Post(param.CallBack, "application/json", utils.FAIL_RES("", res, nil))
-				}
-				return
 			}
 			if param.CallBack != "" {
-				utils.GetRetryHttpClient().Post(param.CallBack, "application/json", utils.SUCCESS_RES("", res, nil))
+				if err2 != nil {
+					utils.GetRetryHttpClient().Post(param.CallBack, "application/json", utils.FAIL_RES("", res, nil))
+				} else {
+					utils.GetRetryHttpClient().Post(param.CallBack, "application/json", utils.SUCCESS_RES("", res, nil))
+				}
 			}
 		})
+		utils.SUCCESS_RES("", res, w)
 	} else {
 		doSave(func(err2 error) {
 			if err != nil {

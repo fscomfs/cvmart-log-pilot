@@ -3,7 +3,6 @@ package Service
 import (
 	"context"
 	"encoding/json"
-	"github.com/avast/retry-go/v4"
 	"github.com/fscomfs/cvmart-log-pilot/config"
 	"github.com/fscomfs/cvmart-log-pilot/quota"
 	"github.com/fscomfs/cvmart-log-pilot/utils"
@@ -124,13 +123,9 @@ func SaveModelFile(w http.ResponseWriter, r *http.Request) {
 					objName = item.ObjectName
 				}
 			}
-			err = retry.Do(func() error {
-				_, err := client.PutObject(context.Background(), param.ObjectBucket, objName, reader, 0, minio.PutObjectOptions{})
-				if err != nil {
-					log.Printf("[SaveModelFile] put object error:%v", err)
-				}
-				return err
-			}, retry.Attempts(5), retry.MaxDelay(10))
+			_, err := client.PutObject(context.Background(), param.ObjectBucket, strings.Trim(objName, "/"), reader, -1, minio.PutObjectOptions{
+				ContentType: "application/octet-stream",
+			})
 			if err != nil {
 				unSaved = append(unSaved, fileName)
 				errorMessage += err.Error() + "\n"
@@ -167,12 +162,14 @@ func SaveModelFile(w http.ResponseWriter, r *http.Request) {
 		go doSave(func(err2 error) {
 			if err2 != nil {
 				res.ErrorMessage += err2.Error() + "\n"
-				utils.GetRetryHttpClient().Post(param.CallBack, "application/json", utils.FAIL_RES("", res, nil))
+				if param.CallBack != "" {
+					utils.GetRetryHttpClient().Post(param.CallBack, "application/json", utils.FAIL_RES("", res, nil))
+				}
+				return
 			}
 			if param.CallBack != "" {
 				utils.GetRetryHttpClient().Post(param.CallBack, "application/json", utils.SUCCESS_RES("", res, nil))
 			}
-
 		})
 	} else {
 		doSave(func(err2 error) {

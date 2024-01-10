@@ -1,4 +1,4 @@
-VERSION=v1.2
+VERSION=v1.3
 REGISTRY=192.168.1.76:8099/evtrain
 IMAGE_NAME=cvmart-daemon
 docker buildx build -t ${REGISTRY}/cvmart-daemon-arm64:${VERSION} --platform linux/arm64 --build-arg  GNU_ARCH="aarch64" -f Dockerfile.filebeat . --load

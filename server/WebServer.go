@@ -26,5 +26,6 @@ func Handler() {
 	http.HandleFunc(utils.INTER_TAIL_FILE, Service.TailFileInterHandler)
 	http.HandleFunc(utils.API_LIST_MODEL_FILE, Service.ListModelFile)
 	http.HandleFunc(utils.API_SAVE_MODEL_FILE, Service.SaveModelFile)
+	http.HandleFunc(utils.API_CONTAINTER_GPU_INFO_FOR_MONITOR, Service.ContainerGpuInfoForMonitorHandler)
 	http.ListenAndServe(fmt.Sprintf(":%d", config.GlobConfig.ServerPort), nil)
 }

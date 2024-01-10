@@ -28,27 +28,28 @@ import (
 )
 
 const (
-	DefaultFileBeatHost    = "/run/filebeat_minio.sock"
-	ENV_HOST_IP            = "ENV_HOST_IP"
-	FileBeatUpload         = "http://localhost/uploadFile"
-	API_LOG                = "/api/log"
-	API_CHECK_GPU          = "/api/checkGpu"
-	API_CONTAINERGPUINFO   = "/api/containerGpuInfo"
-	API_DOWNLOADLOG        = "/api/downloadLog"
-	API_UPLOADLOGBYTRACKNO = "/api/uploadLogByTrackNo"
-	API_SETQUOTA           = "/api/setDirQuota"
-	API_GETDIRQUOTAINFO    = "/api/getDirQuotaInfo"
-	API_GETNODESPACEINFO   = "/api/getNodeSpaceInfo"
-	API_RELEASEDIR         = "/api/releaseDir"
-	API_GETIMAGEQUOTAINFO  = "/api/getImageQuotaInfo"
-	API_FILES              = "/api/listFiles"
-	API_FILE               = "/api/file/"
-	API_TAIL_FILE          = "/api/tailFile"
-	API_LIST_MODEL_FILE    = "/api/listModeFile"
-	API_SAVE_MODEL_FILE    = "/api/saveModeFile"
-	INTER_TAIL_FILE        = "/inter/tailFile"
-	SUCCESS_CODE           = 200
-	FAIL_CODE              = 999
+	DefaultFileBeatHost                 = "/run/filebeat_minio.sock"
+	ENV_HOST_IP                         = "ENV_HOST_IP"
+	FileBeatUpload                      = "http://localhost/uploadFile"
+	API_LOG                             = "/api/log"
+	API_CHECK_GPU                       = "/api/checkGpu"
+	API_CONTAINERGPUINFO                = "/api/containerGpuInfo"
+	API_DOWNLOADLOG                     = "/api/downloadLog"
+	API_UPLOADLOGBYTRACKNO              = "/api/uploadLogByTrackNo"
+	API_SETQUOTA                        = "/api/setDirQuota"
+	API_GETDIRQUOTAINFO                 = "/api/getDirQuotaInfo"
+	API_GETNODESPACEINFO                = "/api/getNodeSpaceInfo"
+	API_RELEASEDIR                      = "/api/releaseDir"
+	API_GETIMAGEQUOTAINFO               = "/api/getImageQuotaInfo"
+	API_FILES                           = "/api/listFiles"
+	API_FILE                            = "/api/file/"
+	API_TAIL_FILE                       = "/api/tailFile"
+	API_LIST_MODEL_FILE                 = "/api/listModeFile"
+	API_SAVE_MODEL_FILE                 = "/api/saveModeFile"
+	INTER_TAIL_FILE                     = "/inter/tailFile"
+	API_CONTAINTER_GPU_INFO_FOR_MONITOR = "/api/containerGpuInfoForMonitor"
+	SUCCESS_CODE                        = 200
+	FAIL_CODE                           = 999
 )
 
 type BaseResult struct {

@@ -6,6 +6,7 @@ import (
 	_ "github.com/fscomfs/cvmart-log-pilot/gpu/atlas"
 	_ "github.com/fscomfs/cvmart-log-pilot/gpu/nvidia"
 	_ "github.com/fscomfs/cvmart-log-pilot/gpu/sophgo"
+	"github.com/fscomfs/cvmart-log-pilot/utils"
 	"github.com/gorilla/websocket"
 	"log"
 	"net/http"
@@ -53,5 +54,34 @@ func ContainerGpuInfoHandler(w http.ResponseWriter, r *http.Request) {
 
 	} else {
 		w.WriteHeader(http.StatusNoContent)
+	}
+}
+
+func ContainerGpuInfoForMonitorHandler(w http.ResponseWriter, r *http.Request) {
+	if ok, err := RequestAndRedirect(w, r); err != nil || ok {
+		return
+	}
+	values := r.URL.Query()
+	containerID := values.Get("containerId")
+	if containerID == "" {
+		utils.FAIL_RES("containerId is empty", nil, w)
+		return
+	}
+	gpuInfoExecutor, _ := gpu.GetExecutor()
+	var index []string
+	if gpuInfoExecutor != nil {
+		index = gpuInfoExecutor.ContainerDevices(containerID)
+		log.Printf("get device size:%+v,ids:%+v", len(index), index)
+	}
+	if len(index) > 0 {
+		if res, error := gpuInfoExecutor.Info(index); error != nil {
+			log.Printf("get gpu info error:%+v", error)
+			utils.FAIL_RES("get gpu info error", nil, w)
+			return
+		} else {
+			utils.SUCCESS_RES("", res, w)
+		}
+	} else {
+		utils.SUCCESS_RES("no gpu", nil, w)
 	}
 }

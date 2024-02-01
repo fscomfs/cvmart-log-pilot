@@ -101,14 +101,19 @@ func (n *NvidiaInfo) Info(indexs []string) (map[string]gpu.InfoObj, error) {
 			devH = GpuDeviceMap[v]
 		} else {
 			if strings.HasPrefix(v, "GPU") {
-				gpuInfo, e := Nvidia_smi(v)
-				if e == nil {
-					res[v] = gpuInfo
-					log.Printf("get gpu info by nvidia success")
-					continue
+				devH, re := nvml.DeviceGetHandleByUUID(strings.TrimSpace(v))
+				if devH.Handle != nil {
+					GpuDeviceMap[v] = devH
 				} else {
-					log.Printf("get gpu info by nvidia error")
-					return res, fmt.Errorf("get deviceHandle error by uuid:%+v", v)
+					gpuInfo, e := Nvidia_smi(v)
+					if e == nil {
+						res[v] = gpuInfo
+						log.Printf("get gpu info by nvidia success")
+						continue
+					} else {
+						log.Printf("get gpu info by nvidia error")
+						return res, fmt.Errorf("get deviceHandle error by uuid:%+v, return:%+v", v, re)
+					}
 				}
 			} else {
 				i, _ := strconv.ParseInt(v, 10, 8)
@@ -180,15 +185,32 @@ func GetInfoByString(info string) (res gpu.InfoObj, err error) {
 			model = l1m[2]
 			l2 := lines[i+2]
 			s := strings.Fields(l2)
-			m1 := memorySizeRegex.FindStringSubmatch(s[8])
+			usedIndex := 0
+			totalIndex := 0
+			gpuUtilIndex := 0
+			for i2, val := range s {
+				if strings.Contains(val, "MiB") {
+					if usedIndex == 0 {
+						usedIndex = i2
+					} else {
+						totalIndex = i2
+					}
+				}
+				if i2 > 0 {
+					if strings.Contains(val, "%") {
+						gpuUtilIndex = i2
+					}
+				}
+			}
+			m1 := memorySizeRegex.FindStringSubmatch(s[usedIndex])
 			if len(m1) >= 2 {
 				used = cast.ToUint64(m1[1])
 			}
-			m2 := memorySizeRegex.FindStringSubmatch(s[10])
+			m2 := memorySizeRegex.FindStringSubmatch(s[totalIndex])
 			if len(m2) >= 2 {
 				memorySize = cast.ToUint64(m2[1])
 			}
-			m3 := gpuUtilRegex.FindStringSubmatch(s[12])
+			m3 := gpuUtilRegex.FindStringSubmatch(s[gpuUtilIndex])
 			if len(m3) >= 2 {
 				utilRate = cast.ToUint32(m3[1])
 			}

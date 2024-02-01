@@ -101,19 +101,14 @@ func (n *NvidiaInfo) Info(indexs []string) (map[string]gpu.InfoObj, error) {
 			devH = GpuDeviceMap[v]
 		} else {
 			if strings.HasPrefix(v, "GPU") {
-				devH, re := nvml.DeviceGetHandleByUUID(strings.TrimSpace(v))
-				if devH.Handle != nil {
-					GpuDeviceMap[v] = devH
+				gpuInfo, e := Nvidia_smi(v)
+				if e == nil {
+					res[v] = gpuInfo
+					log.Printf("get gpu info by nvidia success")
+					continue
 				} else {
-					gpuInfo, e := Nvidia_smi(v)
-					if e == nil {
-						res[v] = gpuInfo
-						log.Printf("get gpu info by nvidia success")
-						continue
-					} else {
-						log.Printf("get gpu info by nvidia error")
-						return res, fmt.Errorf("get deviceHandle error by uuid:%+v, return:%+v", v, re)
-					}
+					log.Printf("get gpu info by nvidia error")
+					return res, fmt.Errorf("get deviceHandle error by uuid:%+v", v)
 				}
 			} else {
 				i, _ := strconv.ParseInt(v, 10, 8)

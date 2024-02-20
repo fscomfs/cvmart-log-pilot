@@ -1,4 +1,4 @@
-VERSION=v1.3
+VERSION=v1.3.1
 REGISTRY=192.168.1.76:8099/evtrain
 IMAGE_NAME=cvmart-daemon
 docker pull uhub.service.ucloud.cn/evtrain/cvmart-daemon-amd64:${VERSION}
